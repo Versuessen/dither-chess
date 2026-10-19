@@ -1,0 +1,74 @@
+import { expect, test, type Page } from '@playwright/test';
+import { Chess } from 'chess.js';
+
+/**
+ * Performance budgets (DECISIONS.md, Phase 7), measured on the production build:
+ *  - start-up with everything cached (service worker): preloader gone within 3 s;
+ *  - JavaScript on the first screen: at most 400 kB (transfer, uncompressed by the preview server);
+ *  - one bot move (fastelo forward pass in the worker, WASM): median ≤ 150 ms, 95th percentile ≤ 400 ms.
+ * The numbers are printed so CI logs keep a record.
+ */
+
+const BUDGET = { warmStartMs: 3000, firstScreenJsKb: 400, inferenceMedianMs: 150, inferenceP95Ms: 400 };
+
+async function bootTime(page: Page): Promise<number> {
+  const t0 = Date.now();
+  await page.goto('/#/');
+  await expect(page.locator('.pre')).toHaveCount(0, { timeout: 30_000 });
+  return Date.now() - t0;
+}
+
+test('meets the start-up and inference budgets', async ({ page }) => {
+  test.setTimeout(6 * 60_000);
+  let js = 0;
+  page.on('response', async (r) => {
+    if (r.request().resourceType() === 'script' || r.url().endsWith('.js')) {
+      const len = Number(r.headers()['content-length'] ?? 0);
+      js += len || (await r.body().catch(() => Buffer.alloc(0))).length;
+    }
+  });
+  const cold = await bootTime(page);
+  const firstJsKb = js / 1024;
+  await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration())?.active, null, { timeout: 60_000 });
+  const warm = await bootTime(page);
+
+  await page.goto('/#/models');
+  const row = page.locator('[data-pack="fastelo-7m"]');
+  await row.getByRole('button', { name: 'Download' }).click();
+  await expect(row).toContainText('verified', { timeout: 5 * 60_000 });
+  await page.goto('/#/settings');
+  await page.locator('fieldset', { hasText: 'Instant bot' }).getByText('On', { exact: true }).click();
+  await page.goto('/#/bot/grinder');
+  const panel = page.getByRole('dialog');
+  await panel.locator('fieldset', { hasText: 'Colour' }).getByText('Black', { exact: true }).click();
+  await panel.getByRole('button', { name: 'Play' }).click();
+
+  // Answer each bot move with a legal reply typed in, and collect the bot's inference times.
+  const screen = page.locator('.screen-game');
+  const input = page.getByLabel('Type a move');
+  const times: number[] = [];
+  for (let i = 0; i < 16; i++) {
+    await expect(screen).toHaveAttribute('data-state', /human|over/, { timeout: 60_000 });
+    if ((await screen.getAttribute('data-state')) === 'over') break;
+    const ms = Number(await screen.getAttribute('data-inference-ms'));
+    if (ms > 0) times.push(ms);
+    const fen = (await screen.getAttribute('data-fen'))!;
+    const moves = new Chess(fen).moves({ verbose: true });
+    const m = moves[(i * 7) % moves.length]!;
+    await input.fill(m.from + m.to + (m.promotion ?? ''));
+    await input.press('Enter');
+    await expect(screen).not.toHaveAttribute('data-fen', fen);
+  }
+  times.sort((a, b) => a - b);
+  const median = times[Math.floor(times.length / 2)]!;
+  const p95 = times[Math.min(times.length - 1, Math.ceil(times.length * 0.95) - 1)]!;
+  const isolated = await page.evaluate(() => crossOriginIsolated);
+  console.log(
+    `perf: cold start ${cold} ms, warm start ${warm} ms, first-screen JS ${firstJsKb.toFixed(0)} kB, ` +
+      `inference median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms over ${times.length} moves (isolated: ${isolated})`
+  );
+  expect(warm).toBeLessThanOrEqual(BUDGET.warmStartMs);
+  expect(firstJsKb).toBeLessThanOrEqual(BUDGET.firstScreenJsKb);
+  expect(median).toBeLessThanOrEqual(BUDGET.inferenceMedianMs);
+  expect(p95).toBeLessThanOrEqual(BUDGET.inferenceP95Ms);
+});

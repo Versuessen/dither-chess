@@ -59,6 +59,8 @@ export class GameController {
   clockRunning = $state<Color | null>(null);
   rated = $state(false);
   canAbort = $state(true);
+  /** Forward-pass time of the bot's last move, ms (shown as a diagnostic). */
+  lastInferenceMs = $state<number | null>(null);
 
   private rng: Rng;
   private pending: unknown = null;
@@ -238,6 +240,7 @@ export class GameController {
       return;
     }
     if (token !== this.botToken || this.disposed || this.outcome) return;
+    this.lastInferenceMs = thought.inferenceMs;
 
     const botColor = this.game.turn;
     // Claim an available draw when not better.

@@ -8,6 +8,12 @@ bundle="$root/src-tauri/target/release/bundle"
 rpm_file="$(ls "$bundle"/rpm/*.rpm | head -n1)"
 appimage="$(ls "$bundle"/appimage/*.AppImage | head -n1)"
 
+# Serve the model packs so the app can install one through its own (Rust) download path.
+python3 -m http.server 8765 --bind 127.0.0.1 --directory "$root/models/packs" >/dev/null 2>&1 &
+server=$!
+trap 'kill $server 2>/dev/null || true' EXIT
+export DITHER_SMOKE_PACKS="http://127.0.0.1:8765/"
+
 rpm --import "$root/packaging/linux/out/dither-rpm-signing.asc"
 # gpgcheck stays on: dnf refuses the package unless its signature verifies.
 dnf -y install --setopt=localpkg_gpgcheck=1 "$rpm_file"
@@ -22,7 +28,9 @@ assert "error" not in r, r
 assert r["storage"] == "sqlite", r
 assert r["modelStore"] == "tauri", r
 assert not r["errors"], r["errors"]
-print("smoke OK:", sys.argv[2], "isolated" if r["crossOriginIsolated"] else "not isolated", r.get("inference"))
+m = r.get("model") or {}
+assert m.get("installed") and m.get("legalMoves") == 20, m
+print("smoke OK:", sys.argv[2], "isolated" if r["crossOriginIsolated"] else "not isolated", r.get("inference"), m)
 PY
 }
 

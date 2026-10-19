@@ -146,7 +146,7 @@ jobs:
     steps:
       - name: Build dependencies
         run: |
-          dnf -y install git nodejs npm rust cargo gcc gcc-c++ make rpm-build rpm-sign gnupg2 pinentry \
+          dnf -y install git nodejs npm rust cargo gcc gcc-c++ make rpm-build rpm-sign gnupg2 pinentry python3 \
             webkit2gtk4.1-devel gtk3-devel libsoup3-devel openssl-devel librsvg2-devel libappindicator-gtk3-devel \
             file wget xorg-x11-server-Xvfb xorg-x11-xauth mesa-dri-drivers dbus-x11 fuse-libs
           npm install -g corepack && corepack enable

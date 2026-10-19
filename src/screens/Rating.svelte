@@ -55,14 +55,17 @@
     if (!r) return [] as { period: string; value: number; live: boolean }[];
     return r.periods.filter((p) => p.ratingAfter !== null).map((p) => ({ period: p.period, value: p.ratingAfter!, live: p.live }));
   });
+  let graphWidth = $state(640);
   const graph = $derived.by(() => {
-    const W = 640;
+    // Drawn at the figure's own width, so text and strokes are never scaled.
+    const W = Math.max(280, Math.round(graphWidth));
     const H = 180;
+    const left = 48;
     if (points.length === 0) return null;
     const vals = points.map((p) => p.value);
     const lo = Math.floor((Math.min(...vals) - 40) / 100) * 100;
     const hi = Math.ceil((Math.max(...vals) + 40) / 100) * 100;
-    const x = (i: number) => (points.length === 1 ? W / 2 : 24 + (i * (W - 48)) / (points.length - 1));
+    const x = (i: number) => (points.length === 1 ? (W + left) / 2 : left + 12 + (i * (W - left - 24)) / (points.length - 1));
     const y = (v: number) => H - 20 - ((v - lo) / (hi - lo)) * (H - 40);
     const closed = points.filter((p) => !p.live);
     const path = closed.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
@@ -105,7 +108,7 @@
     if (Number.isInteger(v) && v >= 1900 && v <= new Date().getFullYear()) void rating.changeSettings({ juniorBirthYear: v });
     else birth = s?.juniorBirthYear === null || !s ? '' : String(s.juniorBirthYear);
   }
-  const fmt = (n: number) => (n > 0 ? `+${n}` : String(n));
+  const fmt = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
   const score = (x: number) => (x === 0.5 ? '½' : String(x));
 </script>
 
@@ -144,11 +147,11 @@
     {/if}
 
     {#if graph && points.length > 1}
-      <figure class="graph">
-        <svg viewBox="0 0 {graph.W} {graph.H}" role="img" aria-label="Rating at the end of each month">
+      <figure class="graph" bind:clientWidth={graphWidth}>
+        <svg width={graph.W} height={graph.H} viewBox="0 0 {graph.W} {graph.H}" role="img" aria-label="Rating at the end of each month">
           {#each graph.ticks as t (t.v)}
-            <line x1="0" x2={graph.W} y1={t.y} y2={t.y} class="grid" />
-            <text x="0" y={t.y - 4} class="tick">{t.v}</text>
+            <line x1="48" x2={graph.W} y1={t.y} y2={t.y} class="grid" />
+            <text x="0" y={t.y + 4} class="tick">{t.v}</text>
           {/each}
           <path d={graph.path} class="line" />
           {#if graph.livePath}<path d={graph.livePath} class="line dashed" />{/if}
@@ -322,9 +325,8 @@
     margin: 26px 0 0;
   }
   .graph svg {
-    width: 100%;
-    height: auto;
     display: block;
+    overflow: visible;
   }
   .grid {
     stroke: color-mix(in srgb, var(--panel-muted) 35%, transparent);

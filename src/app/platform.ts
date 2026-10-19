@@ -6,9 +6,15 @@ export function platform(): Platform {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window ? 'tauri' : 'web';
 }
 
-/** True when SharedArrayBuffer (and so WASM threads) is usable. */
+/**
+ * True when SharedArrayBuffer (and so WASM threads) is usable: the page is cross-origin isolated
+ * and the engine actually exposes SharedArrayBuffer (WebKitGTK reports isolation over HTTP but
+ * ships without it, and never isolates Tauri's custom scheme).
+ */
 export function isCrossOriginIsolated(): boolean {
-  return typeof globalThis.crossOriginIsolated === 'boolean' && globalThis.crossOriginIsolated;
+  return (
+    typeof globalThis.crossOriginIsolated === 'boolean' && globalThis.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined'
+  );
 }
 
 const RELOAD_FLAG = 'dither.coi-reload';

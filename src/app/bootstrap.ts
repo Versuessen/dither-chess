@@ -72,10 +72,33 @@ export function startBoot(): void {
 async function reportBoot(): Promise<void> {
   if (platform() !== 'tauri') return;
   const { emit } = await import('@tauri-apps/api/event');
+  const { invoke } = await import('@tauri-apps/api/core');
   const init = await inference.init().catch(() => null);
+  // With DITHER_SMOKE_PACKS=<url of a pack directory>, also install fastelo through the Rust
+  // store (download, SHA-256, move into place), load it and run one forward pass.
+  let model: Record<string, unknown> | null = null;
+  const packs = await invoke<string | null>('smoke_packs').catch(() => null);
+  if (packs) {
+    const id = 'fastelo-7m';
+    try {
+      await manager.setSources([packs]);
+      await manager.install(id);
+      const status = manager.status[id];
+      if (status?.kind !== 'installed') throw new Error(`install: ${JSON.stringify(status)}`);
+      await loadPack(id);
+      const r = await inference.evaluate(id, ['rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'], 1500, 1500);
+      model = { id, installed: true, legalMoves: r.uci.length, inferenceMs: Math.round(r.inferenceMs) };
+    } catch (err) {
+      model = { id, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
   await emit('dither-booted', {
+    model,
     storage: storage().kind,
     crossOriginIsolated: isCrossOriginIsolated(),
+    secureContext: globalThis.isSecureContext === true,
+    sharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+    origin: location.origin,
     inference: init,
     modelStore: manager.storeKind,
     errors: boot.errors

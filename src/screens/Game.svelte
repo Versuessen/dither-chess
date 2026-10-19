@@ -297,11 +297,12 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<!-- data-fen / data-state describe the live game for assistive tooling and end-to-end tests. -->
+<!-- data-fen / data-state / data-inference-ms describe the live game for tooling, end-to-end and performance tests. -->
 <div
   class="screen-game"
   data-fen={controller?.fen ?? ''}
   data-state={!controller ? 'loading' : controller.outcome ? 'over' : controller.humanToMove ? 'human' : 'bot'}
+  data-inference-ms={controller?.lastInferenceMs?.toFixed(1) ?? ''}
 >
   <a class="corner top-left wordmark" href={href({ name: 'home' })} onclick={(e) => { e.preventDefault(); leave(); }}>DITHER</a>
   <div class="corner top-right status">

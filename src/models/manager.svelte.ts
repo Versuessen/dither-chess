@@ -27,6 +27,7 @@ class ModelManager {
   private stored = new Map<string, StoredPack>();
   private verified = new Set<string>();
   private aborts = new Map<string, AbortController>();
+  private installing = new Map<string, Promise<void>>();
 
   async init(): Promise<void> {
     if (platform() === 'tauri') {
@@ -91,7 +92,17 @@ class ModelManager {
     return this.verified.has(id);
   }
 
-  async install(id: string): Promise<void> {
+  /** Download (or copy a bundled pack), verify and record. A second call while one runs joins it. */
+  install(id: string): Promise<void> {
+    let p = this.installing.get(id);
+    if (!p) {
+      p = this.runInstall(id).finally(() => this.installing.delete(id));
+      this.installing.set(id, p);
+    }
+    return p;
+  }
+
+  private async runInstall(id: string): Promise<void> {
     const pack = packById(id);
     if (!pack || !this.store) return;
     const ctrl = new AbortController();

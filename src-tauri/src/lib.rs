@@ -32,6 +32,7 @@ pub fn run() {
             models::models_read,
             models::models_remove,
             linux::platform_notes,
+            smoke::smoke_packs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running DITHER");

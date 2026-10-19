@@ -11,18 +11,24 @@ function Check-Report($path) {
   if ($r.storage -ne 'sqlite') { throw "storage is $($r.storage), expected sqlite" }
   if ($r.modelStore -ne 'tauri') { throw "model store is $($r.modelStore), expected tauri" }
   if ($r.errors.Count -gt 0) { throw "start-up errors: $($r.errors -join '; ')" }
+  if (-not $r.model.installed -or $r.model.legalMoves -ne 20) { throw "model pack check failed: $($r.model | ConvertTo-Json -Compress)" }
 }
 
 function Run-Smoke($exe) {
   $report = Join-Path $env:RUNNER_TEMP "smoke-$([guid]::NewGuid()).json"
   $env:DITHER_SMOKE = $report
   $p = Start-Process -FilePath $exe -PassThru
-  if (-not $p.WaitForExit(150000)) { $p.Kill(); throw "the app did not exit" }
+  if (-not $p.WaitForExit(300000)) { $p.Kill(); throw "the app did not exit" }
   if ($p.ExitCode -ne 0) { throw "the app exited with $($p.ExitCode)" }
   Check-Report $report
 }
 
 $installRoot = Join-Path $env:LOCALAPPDATA 'Programs'
+
+# Serve the model packs so the app installs one through its own (Rust) download path.
+$packs = Resolve-Path (Join-Path $PSScriptRoot '..\..\models\packs')
+$server = Start-Process python -ArgumentList '-m', 'http.server', '8765', '--bind', '127.0.0.1', '--directory', "`"$packs`"" -PassThru -WindowStyle Hidden
+$env:DITHER_SMOKE_PACKS = 'http://127.0.0.1:8765/'
 
 # NSIS, current user
 $nsis = Get-ChildItem (Join-Path $bundle 'nsis\*.exe') | Select-Object -First 1
@@ -43,4 +49,5 @@ if (-not $exe) { Get-Content $log -Tail 80; throw 'MSI: dither.exe not under %LO
 Run-Smoke $exe.FullName
 $p = Start-Process msiexec.exe -ArgumentList '/x', "`"$($msi.FullName)`"", '/qn' -Wait -PassThru
 if ($p.ExitCode -ne 0) { throw "msiexec /x failed with $($p.ExitCode)" }
+Stop-Process -Id $server.Id -ErrorAction SilentlyContinue
 Write-Host "Windows installers OK ($Variant)"
