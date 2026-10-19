@@ -78,6 +78,11 @@
   /* ---- fixed accent (one per app): the clock flag ------------------------------------ */
   --flag: #e5391f;
 
+  /* ---- evaluation bar and graph: White and Black, the same in both themes --------------- */
+  --eval-white: #f2f2ee;
+  --eval-black: #1b1b1b;
+  --eval-mid: #8c8c8c;
+
   color-scheme: light dark;
 }
 
@@ -112,6 +117,12 @@
   --sq-duo-light: #f1de52;
   --sq-duo-dark: #7486f7;
 
+  /* Game review marks (text on the panel; each also carries a glyph). */
+  --review-best: #1d7a45;
+  --review-inaccuracy: #7a6000;
+  --review-mistake: #b34d00;
+  --review-blunder: #c2261b;
+
   --text-halo: none;
 }
 
@@ -145,6 +156,11 @@
   --sq-duo-light: #8a8cf5;
   --sq-duo-dark: #3a3cf2;
 
+  --review-best: #5cc98a;
+  --review-inaccuracy: #e8c547;
+  --review-mistake: #f28c38;
+  --review-blunder: #ff6b5e;
+
   --text-halo: none;
 }
 
@@ -177,6 +193,11 @@
     --sq-classic-dark: #6e6a61;
     --sq-duo-light: #8a8cf5;
     --sq-duo-dark: #3a3cf2;
+
+    --review-best: #5cc98a;
+    --review-inaccuracy: #e8c547;
+    --review-mistake: #f28c38;
+    --review-blunder: #ff6b5e;
 
     --text-halo: none;
   }

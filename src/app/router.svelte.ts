@@ -5,6 +5,7 @@ export type Route =
   | { name: 'bot'; persona: string }
   | { name: 'game' }
   | { name: 'history' }
+  | { name: 'analysis'; game: string }
   | { name: 'rating' }
   | { name: 'models' }
   | { name: 'settings' };
@@ -15,6 +16,8 @@ export function parseRoute(hash: string): Route {
   switch (head) {
     case 'bot':
       return arg ? { name: 'bot', persona: decodeURIComponent(arg) } : { name: 'home' };
+    case 'analysis':
+      return arg ? { name: 'analysis', game: decodeURIComponent(arg) } : { name: 'history' };
     case 'game':
     case 'history':
     case 'rating':
@@ -32,6 +35,8 @@ export function href(route: Route): string {
       return '#/';
     case 'bot':
       return `#/bot/${encodeURIComponent(route.persona)}`;
+    case 'analysis':
+      return `#/analysis/${encodeURIComponent(route.game)}`;
     default:
       return `#/${route.name}`;
   }

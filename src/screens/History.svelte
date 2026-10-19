@@ -152,6 +152,9 @@
                   <pre class="pgn" data-testid="dev-pgn">{g.pgn}</pre>
                 {/if}
                 <div class="row-actions">
+                  {#if g.moves.length > 0}
+                    <a class="button" href={href({ name: 'analysis', game: g.id })}>{g.analysis ? 'Open review' : 'Review with Stockfish'}</a>
+                  {/if}
                   {#if ratingState(g) !== 'casual'}
                     <button onclick={() => toggleRating(g)}>{ratingState(g) === 'rated' ? 'Remove from rating' : 'Count for rating again'}</button>
                   {/if}
@@ -256,6 +259,7 @@
   }
   .act button,
   .row-actions button,
+  .row-actions a.button,
   .file span {
     display: inline-flex;
     align-items: center;

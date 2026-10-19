@@ -8,9 +8,11 @@
     /** Full-move number of the first move. */
     firstMove?: number;
     blackFirst?: boolean;
+    /** Review marks per ply ("?!", "?", "??") with a kind used for colour. */
+    notes?: Record<number, { glyph: string; kind: string; label: string }>;
     onselect: (ply: number) => void;
   }
-  let { moves, viewing, firstMove = 1, blackFirst = false, onselect }: Props = $props();
+  let { moves, viewing, firstMove = 1, blackFirst = false, notes, onselect }: Props = $props();
 
   let list: HTMLOListElement;
 
@@ -48,17 +50,29 @@
   });
 </script>
 
+{#snippet move(m: { san: string; ply: number })}
+  {@const note = notes?.[m.ply]}
+  <button
+    class:current={viewing === m.ply}
+    class="note-{note?.kind ?? 'none'}"
+    aria-label={note?.label ? `${m.san}, ${note.label}` : undefined}
+    onclick={() => onselect(m.ply)}
+  >
+    {m.san}{#if note?.glyph}<span class="glyph" aria-hidden="true">{note.glyph}</span>{/if}
+  </button>
+{/snippet}
+
 <ol class="moves" bind:this={list} aria-label="Moves">
   {#each rows as r (r.no)}
     <li>
       <span class="no">{r.no}.</span>
       {#if r.white}
-        <button class:current={viewing === r.white.ply} onclick={() => onselect(r.white!.ply)}>{r.white.san}</button>
+        {@render move(r.white)}
       {:else}
         <span class="gap">…</span>
       {/if}
       {#if r.black}
-        <button class:current={viewing === r.black.ply} onclick={() => onselect(r.black!.ply)}>{r.black.san}</button>
+        {@render move(r.black)}
       {/if}
     </li>
   {/each}
@@ -102,5 +116,26 @@
   .gap {
     padding: 2px 6px;
     color: var(--panel-muted);
+  }
+  .glyph {
+    margin-left: 3px;
+    font-weight: 700;
+  }
+  /* Review colours, as on Lichess: inaccuracy amber, mistake orange, blunder red. Each also has
+     its glyph, so colour is never the only signal. */
+  .note-inaccuracy .glyph {
+    color: var(--review-inaccuracy);
+  }
+  .note-mistake .glyph {
+    color: var(--review-mistake);
+  }
+  .note-blunder .glyph {
+    color: var(--review-blunder);
+  }
+  .note-best .glyph {
+    color: var(--review-best);
+  }
+  button.current .glyph {
+    color: inherit;
   }
 </style>

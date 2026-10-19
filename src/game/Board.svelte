@@ -31,6 +31,8 @@
     /** No moves or premoves (review, game over). Marking squares and drawing arrows still work. */
     viewOnly?: boolean;
     label: string;
+    /** Arrows set by the app (the engine's best move in a review), drawn under the player's own. */
+    hints?: { from: Key; to: Key }[];
     onmove: (orig: Key, dest: Key) => void;
   }
   let props: Props = $props();
@@ -222,6 +224,11 @@
 >
   <div bind:this={el} class="cg pieces-{props.pieceSet}"></div>
   <svg bind:this={arrowsEl} class="arrows" viewBox="0 0 8 8" aria-hidden="true">
+    {#each props.hints ?? [] as a (a.from + a.to)}
+      {@const g = arrowGeometry(a.from, a.to)}
+      <polyline class="hint" points={g.line} />
+      <polygon class="hint" points={g.head} />
+    {/each}
     {#each arrows as a (a.from + a.to)}
       {@const g = arrowGeometry(a.from, a.to)}
       <polyline points={g.line} />
@@ -232,6 +239,8 @@
 
 <style>
   .board {
+    /* The engine's suggestion in a review: green, apart from the player's own arrow colour. */
+    --hl-best: var(--review-best);
     position: relative;
     width: 100%;
     aspect-ratio: 1;
@@ -305,6 +314,12 @@
   }
   .arrows polygon {
     fill: var(--hl-arrow);
+  }
+  .arrows polyline.hint {
+    stroke: var(--hl-best);
+  }
+  .arrows polygon.hint {
+    fill: var(--hl-best);
   }
   .cg :global(coords) {
     font-family: var(--font-ui);

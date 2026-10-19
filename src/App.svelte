@@ -8,6 +8,7 @@
   import Models from './screens/Models.svelte';
   import Rating from './screens/Rating.svelte';
   import History from './screens/History.svelte';
+  import Analysis from './screens/Analysis.svelte';
   import Game from './screens/Game.svelte';
   import { createOpponent } from './inference/opponents';
   import { notifyFinished } from './game/finalize';
@@ -105,6 +106,10 @@
   <div class="screen" class:booting><Rating /></div>
 {:else if route.name === 'history' && boot.dataReady}
   <div class="screen" class:booting><History /></div>
+{:else if route.name === 'analysis' && boot.dataReady}
+  {#key route.game}
+    <div class="screen" class:booting><Analysis gameId={route.game} /></div>
+  {/key}
 {:else if route.name === 'game' && session.pending && !booting}
   {#key session.gameNo}
     <Game setup={session.pending} {createOpponent} storage={storage()} onfinished={notifyFinished} />

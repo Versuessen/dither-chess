@@ -32,6 +32,28 @@ export interface StoredGame {
   pgn: string;
   /** fastelo move-quality estimate of the human's moves, added after the game (rating/quality). */
   quality?: StoredQuality;
+  /** Engine review, added when the player asks for one (analysis/). */
+  analysis?: StoredAnalysis;
+}
+
+/** Stockfish's evaluation of every position of a game (start, then after each move). */
+export interface StoredAnalysis {
+  engine: string;
+  depth: number;
+  /** ISO timestamp. */
+  at: string;
+  evals: StoredEval[];
+}
+
+/** One position: centipawns or mate from White's point of view, the best move and its line. */
+export interface StoredEval {
+  cp: number | null;
+  mate: number | null;
+  best: string | null;
+  pv: string[];
+  depth: number;
+  /** Set for a finished position (mate or a draw on the board). */
+  result?: '1-0' | '0-1' | '1/2-1/2';
 }
 
 export interface StoredQuality {

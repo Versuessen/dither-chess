@@ -448,6 +448,9 @@
               {/if}
               <div class="actions">
                 <button class="primary" onclick={playAgain}>Play again</button>
+                {#if controller.moves.length > 0}
+                  <a href={href({ name: 'analysis', game: controller.opts.id })}>Review</a>
+                {/if}
                 <button onclick={copyPgn}>{copied ? 'Copied' : 'Copy PGN'}</button>
                 <button onclick={downloadPgn}>Download PGN</button>
                 <a href={href({ name: 'home' })}>Roster</a>

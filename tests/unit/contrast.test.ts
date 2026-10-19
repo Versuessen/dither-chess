@@ -57,6 +57,13 @@ describe('theme tokens meet WCAG AA', () => {
         expect(contrast(parseColor(t['button-ink']!), parseColor(t['button']!))).toBeGreaterThanOrEqual(AA_NORMAL);
       });
 
+      it('game review marks pass 4.5:1 on the panel', () => {
+        const panel = parseColor(t['panel']!);
+        for (const k of ['review-best', 'review-inaccuracy', 'review-mistake', 'review-blunder']) {
+          expect(contrast(parseColor(t[k]!), panel), k).toBeGreaterThanOrEqual(AA_NORMAL);
+        }
+      });
+
       it('chrome text passes 4.5:1 on paper', () => {
         const paper = parseColor(t['paper']!);
         expect(contrast(parseColor(t['ink']!), paper)).toBeGreaterThanOrEqual(AA_NORMAL);

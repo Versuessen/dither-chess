@@ -60,6 +60,15 @@ Maia-2 (rapid)                   MIT                         University of Toron
   Human-AI Alignment in Chess." NeurIPS 2024.
 
 ------------------------------------------------------------------------------------------
+Game review engine (bundled, vendor/stockfish)
+------------------------------------------------------------------------------------------
+Stockfish 19 (Stockfish.js lite, single-threaded WebAssembly)   GPL-3.0
+  The Stockfish developers; Stockfish.js by Nathan Rugg for Chess.com.
+  https://github.com/official-stockfish/Stockfish   https://github.com/nmrugg/stockfish.js
+  npm stockfish@19.0.0, files unchanged (checksums in vendor/stockfish/SOURCE.md).
+  Used only to review finished games. Never an opponent.
+
+------------------------------------------------------------------------------------------
 Sounds and music (public/sounds, public/music), all CC0 1.0 (public domain dedication)
 ------------------------------------------------------------------------------------------
 Material Sound Effects           CC0 1.0                     Polar_34
