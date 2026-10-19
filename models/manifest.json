@@ -1,6 +1,7 @@
 {
   "format": 1,
   "sources": [
+    "https://ditherchess.vercel.app/models/packs/",
     "https://dither-chess.vercel.app/models/packs/",
     "models/packs/"
   ],

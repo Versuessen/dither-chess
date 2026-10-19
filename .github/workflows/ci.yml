@@ -63,7 +63,7 @@ jobs:
     timeout-minutes: 120
     env:
       # The website the desktop app downloads packs from (repository variable, if set).
-      DITHER_SITE_URL: ${{ vars.DITHER_SITE_URL || 'https://dither-chess.vercel.app' }}
+      DITHER_SITE_URL: ${{ vars.DITHER_SITE_URL || 'https://ditherchess.vercel.app' }}
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7

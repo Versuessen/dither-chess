@@ -2,7 +2,8 @@
 
 Offline chess practice against human-like bots. Every opponent is a neural network trained on human
 games and conditioned on a rating; it picks each move by sampling the predicted human move
-distribution in one forward pass. There is no engine, no search, no account and no server.
+distribution in one forward pass. No engine or search ever plays you, and there is no account and
+no server. Stockfish is included for one job only: reviewing your finished games.
 
 It runs as a web app (installable PWA, offline after the first visit) and as a desktop app for
 Windows 11 and Fedora (KDE), from one codebase.
@@ -13,16 +14,27 @@ Windows 11 and Fedora (KDE), from one codebase.
   play 200 Elo apart. fastelo keeps its own published calibration; its matches show levels between
   800 and 1800 playing closer together than labelled (see [CALIBRATION.md](CALIBRATION.md)). All
   ratings are on the Lichess rapid scale.
-- **A rating by FIDE's rules**: rated rapid games are rated with the FIDE Rapid & Blitz Rating
-  Regulations (monthly periods, K-factors, initial rating, 400-point rule), plus a live rating.
+- **Ratings by FIDE's rules, one per speed**: bullet, blitz, rapid and classical (untimed games
+  count as classical), each with the FIDE Rapid & Blitz Rating Regulations' method (monthly periods,
+  K-factors, initial rating, 400-point rule) plus a live rating. Rated or casual is your choice for
+  any clock. It is a training tool: any game can be aborted without rating, and History can take a
+  game out of the rating (or put it back).
 - **A move-quality estimate** after each game (fastelo's Rater), shown apart from the rating.
+- **Game review**: Stockfish 19 (lite, WebAssembly, in the browser) evaluates every position: an
+  evaluation bar and graph, the best move and line, inaccuracies, mistakes and blunders, and each
+  side's accuracy and average centipawn loss, after Lichess's method.
+- **Opening names** from the Lichess opening tables, by position, during the game and in History.
+- **A board like the big sites'**: last-move and premove highlights, right-click marks and arrows
+  (knight arrows bend), and every colour adjustable in Settings.
+- **Sound and music**: CC0 board and interface sounds, and optional quiet music (see NOTICE).
+- **Phones too**: the website works on phones (iOS included) with a main-menu layout.
 - **Everything stays on your device**: games, ratings and backups (JSON + PGN).
 
 ## Install
 
 ### Web
 
-Open **https://dither-chess.vercel.app** in a Chromium-based browser, Firefox or Safari, and
+Open **https://ditherchess.vercel.app** in a Chromium-based browser, Firefox or Safari, and
 install it from the address bar if you like. The first visit downloads every model by itself:
 the one for your first game while the start screen loads (fastelo, 15 MB), the others (76 MB) in
 the background while you play. After that it works without a connection.
@@ -80,10 +92,11 @@ pnpm test           # unit tests: rules, clocks, PGN, rating, storage, encoders,
 pnpm check          # strict type check
 pnpm models:fetch   # check models/packs against models/manifest.json (SHA-256), fetch what is missing
 pnpm test:e2e       # Playwright on the production build: a full rated game per model, offline session,
-                    # WCAG 2.1 AA (axe) and keyboard play, performance budgets, themes, reduced motion
+                    # WCAG 2.1 AA (axe) and keyboard play, performance budgets, themes, reduced motion,
+                    # the Stockfish review, and phones (iPhone size, touch)
 pnpm test:static    # the website build on a plain static host: sub-path, no COOP/COEP (service-worker
                     # isolation), models installing by themselves, source archive, offline
-DITHER_STATIC_URL=https://dither-chess.vercel.app pnpm test:static   # the same test on the live website
+DITHER_STATIC_URL=https://ditherchess.vercel.app pnpm test:static   # the same test on the live website
 ```
 
 The model-parity tests run the exported ONNX models through onnxruntime-web when they are present in
@@ -110,14 +123,23 @@ configuration, so the Vercel project needs no settings beyond importing the repo
   private.
 
 Every push to `main` deploys to production; other branches and pull requests get preview
-deployments. The Vercel project is `dither-chess` in the team `dither-chess`. To set it up again
+deployments. The Vercel project is `dither-chess` in the team `dither-chess`; it answers at
+`ditherchess.vercel.app` (the main address) and `dither-chess.vercel.app`. To set it up again
 elsewhere: on vercel.com, **Add New → Project**, import this repository and deploy; the project
 name becomes the address (`<name>.vercel.app`).
 
-New model packs: build them (`pnpm models:all` with `DITHER_SITE_URL=https://dither-chess.vercel.app`,
+New model packs: build them (`pnpm models:all` with `DITHER_SITE_URL=https://ditherchess.vercel.app`,
 so the manifest lists the website as their download address), then commit `models/packs` and
 `models/manifest.json`. Keep the old pack files in `models/packs` while installed desktop apps may
 still ask for them.
+
+### Bundled data and assets
+
+- `vendor/chess-openings`: the Lichess opening tables (CC0); `pnpm openings` rebuilds
+  `src/chess/openings.json` from them.
+- `vendor/stockfish`: Stockfish.js 19 lite (GPL-3.0), copied unchanged from npm, for game reviews.
+- `public/sounds`: cut from CC0 packs by `python3 tools/sounds/make.py <downloads>` (sources in NOTICE);
+  `public/music`: two CC0 tracks, unchanged.
 
 ### Models
 
