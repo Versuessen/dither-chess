@@ -756,4 +756,32 @@
       max-height: 22vh;
     }
   }
+  /* Phones: the panel runs edge to edge so the board gets the full width. */
+  @media (max-width: 600px) {
+    .panel {
+      width: 100vw;
+      margin: calc(var(--gutter) * 2.4 + env(safe-area-inset-top)) 0 0;
+      padding: 0 6px calc(14px + env(safe-area-inset-bottom));
+      border-radius: 0;
+    }
+    .panel > .titlebar {
+      margin: 0 -6px 8px;
+      border-radius: 0;
+    }
+    .panel.window::before {
+      display: none;
+    }
+    .board-wrap {
+      width: 100%;
+    }
+    .layout {
+      gap: 12px;
+    }
+    .side {
+      padding: 0 6px;
+    }
+    .top-right {
+      font-size: var(--ui-size-small);
+    }
+  }
 </style>
