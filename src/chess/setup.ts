@@ -16,7 +16,6 @@ export interface GameSetup {
 }
 
 export interface SetupPrefs {
-  family: ModelFamily;
   colour: ColourChoice;
   timeControl: TimeControl;
   rated: boolean;
@@ -27,7 +26,6 @@ export interface SetupPrefs {
 const KEY = 'dither.setup';
 
 export const DEFAULT_PREFS: SetupPrefs = {
-  family: 'fastelo',
   colour: 'random',
   timeControl: DEFAULT_TIME_CONTROL,
   rated: true
@@ -40,7 +38,6 @@ export function loadPrefs(storage: Storage | undefined = globalThis.localStorage
     if (!raw) return DEFAULT_PREFS;
     const v = JSON.parse(raw) as Partial<SetupPrefs>;
     return {
-      family: v.family === 'maia3' || v.family === 'maia2' || v.family === 'fastelo' ? v.family : DEFAULT_PREFS.family,
       colour: v.colour === 'white' || v.colour === 'black' || v.colour === 'random' ? v.colour : DEFAULT_PREFS.colour,
       timeControl:
         v.timeControl && Number.isFinite(v.timeControl.base) && Number.isFinite(v.timeControl.increment)

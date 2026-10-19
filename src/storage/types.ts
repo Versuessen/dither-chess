@@ -30,8 +30,6 @@ export interface StoredGame {
   /** Seed of the bot's sampler, so a game can be replayed exactly. */
   seed: number;
   pgn: string;
-  /** fastelo move-quality estimate of the human's moves, added after the game (rating/quality). */
-  quality?: StoredQuality;
   /** Engine review, added when the player asks for one (analysis/). */
   analysis?: StoredAnalysis;
 }
@@ -54,21 +52,6 @@ export interface StoredEval {
   depth: number;
   /** Set for a finished position (mate or a draw on the board). */
   result?: '1-0' | '0-1' | '1/2-1/2';
-}
-
-export interface StoredQuality {
-  /** fastelo pack and checksum that scored the moves. */
-  pack: string;
-  packSha256: string;
-  /** Corrected estimate, its 1-sigma statistical errors and systematic error, in Elo (Lichess rapid scale as fastelo). */
-  mean: number;
-  minus: number;
-  plus: number;
-  syst: number;
-  resolution: number;
-  userMoves: number;
-  /** Estimate after each of the human's moves, rounded. */
-  curve: number[];
 }
 
 /**

@@ -110,7 +110,7 @@
   {/if}
   {#if games.length === 0}
     <p class="empty">No finished games yet.</p>
-    <p class="note">Every finished game is kept here with its PGN. <a href={href({ name: 'home' })}>Pick an opponent</a> to play one.</p>
+    <p class="note"><a href={href({ name: 'home' })}>Play a game</a>.</p>
   {:else}
     <table>
       <thead>
@@ -178,7 +178,6 @@
 
   <section class="backup">
     <h2 class="label">Backup</h2>
-    <p class="note">Everything on this device: games, the rating ledger and settings, as JSON plus a PGN file of all games.</p>
     <div class="row-actions">
       <button onclick={backup}>Export backup</button>
       <label class="file">

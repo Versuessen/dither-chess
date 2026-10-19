@@ -72,11 +72,11 @@ describe('model install queue', () => {
     vi.unstubAllGlobals();
   });
 
-  it('queues the packs that come with the app, calibrated ones before the optional one', async () => {
+  it('queues the packs that come with the app, any optional ones last', async () => {
     const { manager } = await fresh();
     const optional = MANIFEST.packs.filter((p) => p.optional).map((p) => p.id);
     expect(manager.queued).toHaveLength(MANIFEST.packs.length);
-    expect(manager.queued.slice(-optional.length)).toEqual(optional);
+    if (optional.length) expect(manager.queued.slice(-optional.length)).toEqual(optional);
     for (const p of MANIFEST.packs) expect(manager.availability(p.family).kind).toBe('queued');
   });
 

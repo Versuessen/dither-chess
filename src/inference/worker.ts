@@ -79,12 +79,10 @@ async function handle(req: WorkerRequest): Promise<unknown> {
       return result;
     }
     case 'load':
-      await need().load(req.packId, req.family, new Uint8Array(req.model), req.vocab, preferWebGpu);
+      await need().load(req.packId, new Uint8Array(req.model), req.vocab, preferWebGpu);
       return { backend: need().backend };
     case 'evaluate':
       return need().evaluate(req.packId, req.fens, req.eloSelf, req.eloOppo);
-    case 'move-logp':
-      return need().moveLogp(req.packId, req.items, req.elos);
     case 'unload':
       await need().unload(req.packId);
       return null;

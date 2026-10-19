@@ -14,7 +14,7 @@ export interface DpkFile {
 export interface DpkHeader {
   id: string;
   version: string;
-  family: 'fastelo' | 'maia3' | 'maia2';
+  family: 'maia3';
   meta: Record<string, unknown>;
   files: DpkFile[];
 }

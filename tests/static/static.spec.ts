@@ -57,9 +57,9 @@ test('the website installs its models by itself and runs from a static host', as
   // Headers from the host isolate the first load; without them the service worker's reload does.
   expect(loads, 'page loads until isolated').toBe(test.info().config.metadata.hostSendsHeaders ? 1 : 2);
 
-  // The first game's model (fastelo, the default) was installed behind the preloader.
+  // The model was installed behind the preloader.
   await page.goto('./#/models');
-  await expect(page.locator('[data-pack="fastelo-7m"]')).toContainText('verified');
+  await expect(page.locator('[data-pack="maia3-23m"]')).toContainText('verified');
   // The rest arrive by themselves, nobody clicks Download.
   for (const p of manifest.packs) {
     await expect(page.locator(`[data-pack="${p.id}"]`)).toContainText('verified', { timeout: 5 * 60_000 });

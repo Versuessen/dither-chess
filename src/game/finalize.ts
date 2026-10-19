@@ -13,7 +13,7 @@ const hooks: FinishedHook[] = [];
 
 /**
  * Work that follows every finished game, including games settled at start-up: the rating ledger
- * and the move-quality estimate register here. Hooks run in registration order.
+ * registers here. Hooks run in registration order.
  */
 export function onGameFinished(fn: FinishedHook): () => void {
   hooks.push(fn);

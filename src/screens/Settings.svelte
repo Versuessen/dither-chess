@@ -15,13 +15,12 @@
 
   type Flag = 'coordinates' | 'sounds' | 'music' | 'instantBot' | 'premoves' | 'showDests' | 'autoQueen';
   const flags: { key: Flag; label: string; hint: string }[] = [
-    { key: 'coordinates', label: 'Coordinates', hint: 'Files and ranks on the board edge.' },
-    { key: 'showDests', label: 'Legal moves', hint: 'Dots on the squares a picked-up piece can reach.' },
-    { key: 'premoves', label: 'Premoves', hint: 'Queue a move while the bot is thinking.' },
-    { key: 'autoQueen', label: 'Auto-queen', hint: 'Promote to a queen without asking.' },
-    { key: 'sounds', label: 'Sounds', hint: 'Wooden knocks for moves and captures, soft tones for checks and the interface.' },
-    { key: 'music', label: 'Music', hint: 'Quiet ambient music with long pauses, on every screen.' },
-    { key: 'instantBot', label: 'Instant bot', hint: 'The bot moves as soon as it has chosen, without a human-like pause.' }
+    { key: 'coordinates', label: 'Coordinates', hint: '' },
+    { key: 'showDests', label: 'Legal moves', hint: '' },
+    { key: 'premoves', label: 'Premoves', hint: 'Right-click cancels queued premoves.' },
+    { key: 'autoQueen', label: 'Auto-queen', hint: '' },
+    { key: 'sounds', label: 'Sounds', hint: '' },
+    { key: 'instantBot', label: 'Instant bot', hint: '' }
   ];
   const onOff = [
     { value: true, label: 'On' },
@@ -69,7 +68,7 @@
           ]}
           onchange={(v) => themeStore.set(v)}
         />
-        <p class="hint">Now showing {themeStore.theme}. Press T anywhere to switch.</p>
+        <p class="hint">T switches the theme anywhere.</p>
       </div>
       <div class="row">
         <Toggle
@@ -81,13 +80,7 @@
           ]}
           onchange={(v) => ui.setMotion(v)}
         />
-        <p class="hint">
-          {ui.systemReducedMotion
-            ? 'Your system asks for reduced motion: the background stays still.'
-            : ui.reducedMotion
-              ? 'Reduced: the background stays still and images swap instantly.'
-              : 'The background moves with the pointer and drifts in knight moves.'}
-        </p>
+        
       </div>
     </div>
   </section>
@@ -117,7 +110,7 @@
       {#each flags as f (f.key)}
         <div class="row">
           <Toggle legend={f.label} value={settings.value[f.key]} options={onOff} onchange={(v) => set({ [f.key]: v })} />
-          <p class="hint">{f.hint}</p>
+          {#if f.hint}<p class="hint">{f.hint}</p>{/if}
         </div>
       {/each}
     </div>
@@ -150,6 +143,7 @@
 
   <section class="group" aria-labelledby="s-system">
     <h2 id="s-system" class="label">System</h2>
+    {#if settings.value.devMode}
     <p class="hint">
       {desktop ? 'Desktop app' : 'Browser'} · data in {storage().kind === 'sqlite' ? 'SQLite' : storage().kind === 'indexeddb' ? 'IndexedDB' : 'memory only'} ·
       {isCrossOriginIsolated() ? 'cross-origin isolated' : 'not cross-origin isolated'}
@@ -157,15 +151,13 @@
         · inference on {engine.backend === 'webgpu' ? 'WebGPU' : 'WebAssembly'}, {engine.threads} {engine.threads === 1 ? 'thread' : 'threads'}
       {/if}
     </p>
-    {#if engine?.singleThreadReason}
-      <p class="hint" data-testid="single-thread-reason">Multi-threaded inference failed on this device, so it runs on one thread: {engine.singleThreadReason}</p>
+    {/if}
+    {#if engine?.singleThreadReason && settings.value.devMode}
+      <p class="hint" data-testid="single-thread-reason">One inference thread: {engine.singleThreadReason}</p>
     {/if}
     {#each notes as n (n)}<p class="hint">{n}</p>{/each}
     {#if sourceUrl}
-      <p class="hint">
-        DITHER is free software under the GNU Affero General Public License 3.0.
-        <a href={sourceUrl} download>Download the source code of this version</a> (licences of the models and libraries in NOTICE).
-      </p>
+      <p class="hint"><a href={sourceUrl} download>Source code of this version</a> · AGPL-3.0</p>
     {/if}
   </section>
 </ScreenFrame>

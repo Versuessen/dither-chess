@@ -67,7 +67,7 @@ function buildPack(files: Record<string, Uint8Array>, id = 'test-pack'): Uint8Ar
     offset += bytes.length;
     return e;
   });
-  const header = enc.encode(JSON.stringify({ id, version: '1', family: 'fastelo', meta: {}, files: entries }));
+  const header = enc.encode(JSON.stringify({ id, version: '1', family: 'maia3', meta: {}, files: entries }));
   const out = new Uint8Array(8 + header.length + offset);
   out.set(enc.encode('DPK1'), 0);
   new DataView(out.buffer).setUint32(4, header.length, true);

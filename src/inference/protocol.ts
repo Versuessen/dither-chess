@@ -16,7 +16,6 @@ export interface InitRequest {
 export interface LoadRequest {
   type: 'load';
   packId: string;
-  family: 'fastelo' | 'maia3' | 'maia2';
   model: ArrayBuffer;
   vocab: string[];
 }
@@ -29,26 +28,12 @@ export interface EvaluateRequest {
   eloOppo: number;
 }
 
-/** One played move to score: the positions up to and including the one it was played in. */
-export interface ScoredMove {
-  fens: string[];
-  move: string;
-}
-
-/** log p(move) of played moves under several rating inputs (fastelo Rater). */
-export interface MoveLogpRequest {
-  type: 'move-logp';
-  packId: string;
-  items: ScoredMove[];
-  elos: number[];
-}
-
 export interface UnloadRequest {
   type: 'unload';
   packId: string;
 }
 
-export type WorkerRequest = InitRequest | LoadRequest | EvaluateRequest | MoveLogpRequest | UnloadRequest;
+export type WorkerRequest = InitRequest | LoadRequest | EvaluateRequest | UnloadRequest;
 
 export interface InitResult {
   backend: Backend;
@@ -62,12 +47,6 @@ export interface EvaluateResult {
   uci: string[];
   logits: Float32Array;
   wdl: WDL | null;
-  inferenceMs: number;
-}
-
-export interface MoveLogpResult {
-  /** Row-major [moves × elos]. */
-  logp: Float64Array;
   inferenceMs: number;
 }
 

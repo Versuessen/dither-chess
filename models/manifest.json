@@ -7,107 +7,6 @@
   ],
   "packs": [
     {
-      "id": "fastelo-7m",
-      "version": "1.0.0",
-      "family": "fastelo",
-      "title": "fastelo 7M",
-      "file": "fastelo-7m-1.0.0.dpk",
-      "sha256": "c9e3e913a5a77eb53d3e077785d4b6309bcd41697269d29bf0b886713235ef5d",
-      "size": 14974542,
-      "license": "GPL-3.0",
-      "source": {
-        "type": "huggingface",
-        "repo": "irsotarriva/fastelo",
-        "revision": "eb9e26fc363adbb74ada76d03f018be3fd398bb3",
-        "license": "GPL-3.0"
-      },
-      "variant": "fp16w",
-      "optional": false,
-      "calibration": {
-        "method": "published (fastelo calibration.json)",
-        "levels": [
-          600,
-          650,
-          700,
-          750,
-          800,
-          850,
-          900,
-          950,
-          1000,
-          1050,
-          1100,
-          1150,
-          1200,
-          1250,
-          1300,
-          1350,
-          1400,
-          1450,
-          1500,
-          1550,
-          1600,
-          1650,
-          1700,
-          1750,
-          1800,
-          1850,
-          1900
-        ]
-      }
-    },
-    {
-      "id": "maia3-5m",
-      "version": "1.0.0",
-      "family": "maia3",
-      "title": "Maia-3 5M",
-      "file": "maia3-5m-1.0.0.dpk",
-      "sha256": "ef3e53d99f45bcdba6da9038912d34639449c64c4834cb69e7ae64613b74d574",
-      "size": 8047539,
-      "license": "AGPL-3.0",
-      "source": {
-        "type": "huggingface",
-        "repo": "UofTCSSLab/Maia3-5M",
-        "revision": "b6559de2398d7140b985f28fd2c19fb5e47ddabe",
-        "license": "AGPL-3.0"
-      },
-      "variant": "int8",
-      "optional": false,
-      "calibration": {
-        "method": "tools/calibrate",
-        "levels": [
-          600,
-          650,
-          700,
-          750,
-          800,
-          850,
-          900,
-          950,
-          1000,
-          1050,
-          1100,
-          1150,
-          1200,
-          1250,
-          1300,
-          1350,
-          1400,
-          1450,
-          1500,
-          1550,
-          1600,
-          1650,
-          1700,
-          1750,
-          1800,
-          1850,
-          1900,
-          1950
-        ]
-      }
-    },
-    {
       "id": "maia3-23m",
       "version": "1.0.0",
       "family": "maia3",
@@ -123,7 +22,7 @@
         "license": "AGPL-3.0"
       },
       "variant": "int8",
-      "optional": true,
+      "optional": false,
       "calibration": {
         "method": "tools/calibrate",
         "levels": [
@@ -157,37 +56,6 @@
           1950,
           2000,
           2050
-        ]
-      }
-    },
-    {
-      "id": "maia2-rapid",
-      "version": "1.0.0",
-      "family": "maia2",
-      "title": "Maia-2 rapid",
-      "file": "maia2-rapid-1.0.0.dpk",
-      "sha256": "fa0e739c305e2512fa46a84b83982f6ba834eec80cc5f4a03daf15170e0f104b",
-      "size": 41510331,
-      "license": "MIT (model), GPL-3.0 (ONNX export repository)",
-      "source": {
-        "type": "git",
-        "url": "https://github.com/CSSLab/maia-platform-frontend",
-        "commit": "a6e52f5c811ee18863cb2f0e81f2433a5b9905de",
-        "license": "GPL-3.0"
-      },
-      "variant": "int8",
-      "optional": false,
-      "calibration": {
-        "method": "tools/calibrate",
-        "levels": [
-          1100,
-          1200,
-          1300,
-          1400,
-          1500,
-          1600,
-          1700,
-          1800
         ]
       }
     }

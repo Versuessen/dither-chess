@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { settings } from '../app/settings.svelte';
   import { onMount } from 'svelte';
   import ScreenFrame from '../ui/ScreenFrame.svelte';
   import LabelValue from '../ui/LabelValue.svelte';
@@ -52,11 +53,6 @@
 </script>
 
 <ScreenFrame title="Models" current="models" wide>
-  <p class="intro">
-    Each bot is a neural network trained on human games. Packs download once and stay on this device; every pack is
-    checked against its SHA-256 checksum before a game can use it.
-  </p>
-
   <ul class="packs">
     {#each MANIFEST.packs as p (p.id)}
       {@const st = manager.status[p.id] ?? { kind: 'absent' }}
@@ -68,7 +64,7 @@
         <div class="facts">
           <LabelValue label="Size" value="{mb(p.size)}{p.variant !== 'fp32' ? ` · ${p.variant}` : ''}" />
           <LabelValue label="Licence" value={p.license} />
-          <LabelValue label="Source" value={sourceText(p.source)} />
+          {#if settings.value.devMode}<LabelValue label="Source" value={sourceText(p.source)} />{/if}
           <div class="status">
             <span class="label">Status</span>
             {#if st.kind === 'absent'}
@@ -86,10 +82,10 @@
             {/if}
           </div>
           <div class="wide">
-            <span class="label">Levels (Lichess rapid)</span>
+            <span class="label">Levels</span>
             <LevelStrip covered={p.calibration.levels} label="{p.title} levels" />
             {#if !p.calibration.levels.length}
-              <p class="hint">No level has been calibrated for this model yet, so it cannot be played.</p>
+              <p class="hint">No playable levels yet.</p>
             {/if}
           </div>
         </div>
@@ -109,7 +105,7 @@
   <section class="extra">
     <div>
       <h2 class="label">Import from file</h2>
-      <p class="hint">For machines without internet: copy a .dpk pack from another computer and pick it here.</p>
+
       <label class="file">
         <input bind:this={fileInput} type="file" accept=".dpk" onchange={onImport} />
         <span>Choose pack file</span>
@@ -117,6 +113,7 @@
       {#if importError}<p class="error" role="alert">{importError}</p>{/if}
       {#if importOk}<p class="ok" role="status">{importOk}</p>{/if}
     </div>
+    {#if settings.value.devMode}
     <div>
       <h2 class="label">Download sources</h2>
       <p class="hint">One URL prefix per line, tried in order.</p>
@@ -135,16 +132,11 @@
       {/if}
       <p class="hint">Storage: {manager.storeKind === 'opfs' ? 'browser (OPFS)' : manager.storeKind === 'tauri' ? 'app data folder' : 'unavailable in this browser'}</p>
     </div>
+    {/if}
   </section>
 </ScreenFrame>
 
 <style>
-  .intro {
-    margin: 0 0 26px;
-    color: var(--panel-muted);
-    font-size: var(--ui-size-small);
-    max-width: 70ch;
-  }
   .packs {
     list-style: none;
     margin: 0;

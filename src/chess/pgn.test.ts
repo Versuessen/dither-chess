@@ -19,14 +19,14 @@ describe('PGN', () => {
     g.resign('b');
     const pgn = toPgn({
       white: 'You',
-      black: 'Grinder (fastelo 1200)',
+      black: 'Grinder (Maia-3 1200)',
       blackElo: 1200,
       startedAt: new Date(Date.UTC(2026, 9, 19, 12, 30, 0)),
       timeControl: g.timeControl,
       outcome: g.outcome,
       moves: g.records,
       rated: g.rated,
-      extra: { DitherModel: 'fastelo', DitherLevel: '1200' }
+      extra: { DitherModel: 'maia3', DitherLevel: '1200' }
     });
     for (const tag of ['Event', 'Site', 'Date', 'Round', 'White', 'Black', 'Result']) {
       expect(pgn).toMatch(new RegExp(`^\\[${tag} "`, 'm'));

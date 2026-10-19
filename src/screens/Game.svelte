@@ -21,8 +21,6 @@
   import type { AppStorage, StoredGame } from '../storage/types';
   import { createRng } from '../lib/rng';
   import { parseTypedMove, spokenSan } from '../game/typedMove';
-  import { quality } from '../rating/quality.svelte';
-  import { quote } from '../rating/moveQuality';
   import { rating, ratingLabel } from '../rating/rating.svelte';
   import { loadOpenings, nameOpening, type OpeningTable } from '../chess/openings';
 
@@ -445,23 +443,6 @@
                       : ''}
                 </p>
               {/if}
-              {#if controller.outcome.result !== '*'}
-                {@const q = quality.status[controller.opts.id]}
-                <div class="quality" data-quality={q?.kind ?? 'none'}>
-                  {#if q?.kind === 'done'}
-                    <span class="label">Move quality</span>
-                    <span class="q-value">{quote(q.quality.mean)}</span>
-                    <span class="note">
-                      −{Math.round(q.quality.minus)}/+{Math.round(q.quality.plus)} · syst. ±{Math.round(q.quality.syst)} · fastelo estimate
-                      from your {q.quality.userMoves} moves, not your rating
-                    </span>
-                  {:else if q?.kind === 'pending'}
-                    <span class="note">Estimating move quality…</span>
-                  {:else if q?.kind === 'unavailable'}
-                    <span class="note">{q.reason}</span>
-                  {/if}
-                </div>
-              {/if}
               <div class="actions">
                 <button class="primary" onclick={playAgain}>Play again</button>
                 {#if controller.moves.length > 0}
@@ -741,23 +722,6 @@
     font-size: var(--ui-size-small);
     text-transform: none;
     letter-spacing: 0.04em;
-  }
-  .quality {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    align-items: baseline;
-    gap: 2px 12px;
-  }
-  .quality .note {
-    grid-column: 1 / -1;
-    text-transform: none;
-    letter-spacing: 0.04em;
-  }
-  .q-value {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 22px;
-    text-transform: uppercase;
   }
   .failure {
     display: grid;

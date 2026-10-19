@@ -373,7 +373,7 @@ mod tests {
 
     #[test]
     fn names_cannot_escape_the_directory() {
-        assert!(safe_name("fastelo-7m-1.0.0.dpk").is_ok());
+        assert!(safe_name("maia3-23m-1.0.0.dpk").is_ok());
         for bad in ["../x.dpk", "a/b.dpk", "a\\b.dpk", ".dpk", "x.onnx", "", "x .dpk"] {
             assert!(safe_name(bad).is_err(), "{bad}");
         }

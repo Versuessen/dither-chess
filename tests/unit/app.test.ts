@@ -40,14 +40,14 @@ describe('roster', () => {
 });
 
 describe('model catalog', () => {
-  it('offers levels from 600 to 1900 in steps of 50', () => {
+  it('offers levels from 600 to 2050 in steps of 50', () => {
     expect(ALL_LEVELS[0]).toBe(600);
-    expect(ALL_LEVELS.at(-1)).toBe(1900);
-    expect(ALL_LEVELS.length).toBe(27);
+    expect(ALL_LEVELS.at(-1)).toBe(2050);
+    expect(ALL_LEVELS.length).toBe(30);
   });
-  it('exposes no Maia-3 level before calibration, and Maia-2 only from 1100', () => {
-    expect(MODELS.find((m) => m.family === 'maia3')!.defaultLevels).toEqual([]);
-    expect(Math.min(...MODELS.find((m) => m.family === 'maia2')!.defaultLevels)).toBe(1100);
+  it('has one model, Maia-3 23M, with no level before its calibration is installed', () => {
+    expect(MODELS.map((m) => m.pack)).toEqual(['maia3-23m']);
+    expect(MODELS[0]!.defaultLevels).toEqual([]);
   });
   it('snaps to the nearest playable level', () => {
     expect(nearestLevel([1100, 1150, 1200], 700)).toBe(1100);
@@ -71,8 +71,8 @@ describe('setup preferences', () => {
   it('round-trips and rejects garbage', () => {
     const s = memory();
     expect(loadPrefs(s)).toEqual(DEFAULT_PREFS);
-    savePrefs({ family: 'maia2', colour: 'black', timeControl: { base: 600, increment: 5 }, rated: false }, s);
-    expect(loadPrefs(s)).toEqual({ family: 'maia2', colour: 'black', timeControl: { base: 600, increment: 5 }, rated: false });
+    savePrefs({ colour: 'black', timeControl: { base: 600, increment: 5 }, rated: false }, s);
+    expect(loadPrefs(s)).toEqual({ colour: 'black', timeControl: { base: 600, increment: 5 }, rated: false });
     s.setItem('dither.setup', '{"family":"maia3","colour":"white","timeControl":{"base":180,"increment":2}}');
     expect(loadPrefs(s).rated).toBe(true); // prefs saved before the rated choice existed
     s.setItem('dither.setup', '{"family":"stockfish","colour":7}');

@@ -1,7 +1,6 @@
 /**
  * Sampling from a model's move distribution, exactly as the reference code does:
- *  - temperature: p = softmax(logits / T) over the legal moves (fastelo CalibratedPolicy and
- *    maia3/uci.py sample_from_logits agree on this);
+ *  - temperature: p = softmax(logits / T) over the legal moves (maia3/uci.py sample_from_logits);
  *  - top-p (maia3 sample_from_logits): sort descending, keep entries whose cumulative mass is
  *    <= top_p, always keep the first, renormalise.
  * The random source is the game's seeded RNG, so a game replays exactly from its seed.

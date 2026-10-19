@@ -53,7 +53,6 @@ test('a game can be started from Play and played by tapping', async ({ page }) =
   const panel = page.getByRole('dialog');
   await expect(panel).toBeVisible();
   await expect(panel.locator('.titlebar')).toContainText('Custom game');
-  await panel.locator('fieldset', { hasText: 'Model' }).getByText(new RegExp(`^${pack!.title.split(' ')[0]}`)).tap();
   await panel.locator('fieldset', { hasText: 'Colour' }).getByText('White', { exact: true }).tap();
   await panel.getByRole('button', { name: 'Play' }).tap();
 

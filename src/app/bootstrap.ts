@@ -13,19 +13,13 @@ import { manager } from '../models/manager.svelte';
 import { models } from '../models/state.svelte';
 import { inference } from '../inference/client';
 import { loadPack } from '../inference/opponents';
-import { packById } from '../models/manifest';
+import { defaultPack } from '../models/manifest';
 import { finishUnfinished, onGameFinished } from '../game/finalize';
-import { quality } from '../rating/quality.svelte';
 import { rating } from '../rating/rating.svelte';
-import { loadPrefs } from '../chess/setup';
 
 export function startBoot(): void {
-  // After every finished game: the rating ledger (awaited, so the result panel can show the new
-  // rating), then the move-quality estimate in the background.
+  // After every finished game: the rating ledger (awaited, so the result panel can show the new rating).
   onGameFinished((g) => rating.record(g));
-  onGameFinished((g) => {
-    void quality.run(storage(), g);
-  });
 
   const ready = boot.track(
     'storage',
@@ -45,17 +39,10 @@ export function startBoot(): void {
     'inference',
     ready.then(async () => {
       await inference.init();
-      // Warm the model of the family played last: installed, or queued to install by itself.
-      const family = loadPrefs().family;
-      // Same preference as models.packFor: calibrated levels first, then the high-quality pack.
-      const rank = (id: string) => ((packById(id)?.calibration.levels.length ?? 0) > 0 ? 2 : 0) + (packById(id)?.optional ? 1 : 0);
-      const queued = manager.queued.flatMap((id) => {
-        const p = packById(id);
-        return p ? [{ id, family: p.family }] : [];
-      });
-      const candidates = [...manager.installedIds(), ...queued].sort((a, b) => rank(b.id) - rank(a.id));
-      const id = candidates.find((x) => x.family === family)?.id ?? candidates[0]?.id;
-      if (id) {
+      // Warm the model: installed, or queued to install by itself (the website installs it).
+      const id = defaultPack('maia3')?.id;
+      const have = !!id && (manager.installedIds().some((x) => x.id === id) || manager.queued.includes(id));
+      if (id && have) {
         if (manager.queued.includes(id)) await manager.install(id, (f) => boot.partial('inference', f));
         await manager.ensureVerified(id);
         await loadPack(id);
@@ -101,12 +88,12 @@ async function reportBoot(): Promise<void> {
   const { emit } = await import('@tauri-apps/api/event');
   const { invoke } = await import('@tauri-apps/api/core');
   const init = await inference.init().catch(() => null);
-  // With DITHER_SMOKE_PACKS=<url of a pack directory>, also install fastelo through the Rust
+  // With DITHER_SMOKE_PACKS=<url of a pack directory>, also install the model through the Rust
   // store (download, SHA-256, move into place), load it and run one forward pass.
   let model: Record<string, unknown> | null = null;
   const packs = await invoke<string | null>('smoke_packs').catch(() => null);
   if (packs) {
-    const id = 'fastelo-7m';
+    const id = defaultPack('maia3')?.id ?? 'maia3-23m';
     try {
       await manager.setSources([packs]);
       await manager.install(id);

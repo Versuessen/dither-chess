@@ -2,7 +2,7 @@
 import wasmGpuUrl from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url';
 import wasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url';
 import { isCrossOriginIsolated } from '../app/platform';
-import type { EvaluateResult, InitResult, MoveLogpResult, ScoredMove, WorkerRequest, WorkerResponse } from './protocol';
+import type { EvaluateResult, InitResult, WorkerRequest, WorkerResponse } from './protocol';
 
 /** The worker became unusable (not a failed request): it is replaced on the next call. */
 class InferenceCrash extends Error {}
@@ -73,10 +73,10 @@ class InferenceClient {
     return this.loaded.has(packId);
   }
 
-  async load(packId: string, family: 'fastelo' | 'maia3' | 'maia2', model: Uint8Array, vocab: string[]): Promise<void> {
+  async load(packId: string, model: Uint8Array, vocab: string[]): Promise<void> {
     const init = await this.init();
     try {
-      await this.loadOnce(packId, family, model, vocab);
+      await this.loadOnce(packId, model, vocab);
     } catch (err) {
       // onnxruntime-web runs WebAssembly threads in workers it starts itself. The worker checks
       // that such workers can start before asking for threads (worker.ts, threadProblem); if a
@@ -86,14 +86,14 @@ class InferenceClient {
       this.singleThreadReason = err.message;
       console.warn(`Inference continues on one thread: ${err.message}`);
       await this.init();
-      await this.loadOnce(packId, family, model, vocab);
+      await this.loadOnce(packId, model, vocab);
     }
   }
 
-  private async loadOnce(packId: string, family: 'fastelo' | 'maia3' | 'maia2', model: Uint8Array, vocab: string[]): Promise<void> {
+  private async loadOnce(packId: string, model: Uint8Array, vocab: string[]): Promise<void> {
     // A copy goes to the worker (transferred), so the bytes stay here for a retry.
     const buf = model.slice().buffer;
-    await this.call({ type: 'load', packId, family, model: buf, vocab }, [buf]);
+    await this.call({ type: 'load', packId, model: buf, vocab }, [buf]);
     this.loaded.add(packId);
   }
 
@@ -101,9 +101,6 @@ class InferenceClient {
     return this.call<EvaluateResult>({ type: 'evaluate', packId, fens, eloSelf, eloOppo });
   }
 
-  moveLogp(packId: string, items: ScoredMove[], elos: number[]): Promise<MoveLogpResult> {
-    return this.call<MoveLogpResult>({ type: 'move-logp', packId, items, elos });
-  }
 
   async unload(packId: string): Promise<void> {
     if (!this.loaded.has(packId)) return;

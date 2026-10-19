@@ -8,7 +8,7 @@ import type { StoredGame } from '../storage/types';
 
 /** Test double: replays a fixed list of moves. Lives only in tests; never shipped. */
 class ScriptedOpponent implements Opponent {
-  family = 'fastelo' as const;
+  family = 'maia3' as const;
   pack = { id: 'test-pack', sha256: '0'.repeat(64) };
   seed = 42;
   calls = 0;

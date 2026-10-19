@@ -65,7 +65,6 @@ for (const pack of packs) {
     await page.goto('/#/bot/grinder');
     const panel = page.getByRole('dialog');
     await expect(panel).toBeVisible();
-    await panel.locator('fieldset', { hasText: 'Model' }).getByText(new RegExp(`^${pack.title.split(' ')[0]}`)).click();
     await panel.locator('fieldset', { hasText: 'Colour' }).getByText('White', { exact: true }).click();
     await panel.locator('fieldset', { hasText: 'Clock' }).getByText('15+10', { exact: true }).click();
     await expect(panel.getByText('Clock · Rapid')).toBeVisible();
@@ -93,17 +92,6 @@ for (const pack of packs) {
     await expect(result).toBeVisible();
     await expect(result.locator('.big')).toHaveText(/^(1-0|0-1|1\/2-1\/2)$/);
     await expect(result).toContainText('rated');
-
-    // The move-quality estimate follows in the background; it needs the fastelo pack.
-    const q = result.locator('.quality');
-    if (pack.family === 'fastelo') {
-      await expect(q).toHaveAttribute('data-quality', 'done', { timeout: 5 * 60_000 });
-      await expect(q.locator(".q-value")).toHaveText(/^(below 600|\d{3,4}|2200\+)$/);
-      await expect(q).toContainText('not your rating');
-    } else {
-      await expect(q).toHaveAttribute('data-quality', 'unavailable');
-      await expect(q).toContainText('Install the fastelo pack');
-    }
 
     // The finished game is stored with its PGN.
     await result.getByRole('link', { name: 'Roster' }).click();

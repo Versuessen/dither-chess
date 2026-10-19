@@ -8,12 +8,10 @@
   import { session } from '../app/session.svelte';
   import { models } from '../models/state.svelte';
   import { manager } from '../models/manager.svelte';
-  import { MODELS, modelInfo, nearestLevel, type ModelFamily } from '../models/catalog';
+  import { nearestLevel } from '../models/catalog';
   import { loadPrefs, savePrefs, type ColourChoice } from '../chess/setup';
   import { TIME_CONTROLS, SPEED_LABEL, formatTimeControl, speedOf, type TimeControl } from '../chess/timeControl';
-  import DitherTile from '../dither/DitherTile.svelte';
   import Toggle from '../ui/Toggle.svelte';
-  import LabelValue from '../ui/LabelValue.svelte';
 
   interface Props {
     persona: Persona;
@@ -21,7 +19,6 @@
   let { persona }: Props = $props();
 
   const prefs = loadPrefs();
-  let family = $state<ModelFamily>(prefs.family);
   let colour = $state<ColourChoice>(prefs.colour);
   let timeControl = $state<TimeControl>(prefs.timeControl);
   let rated = $state(prefs.rated);
@@ -31,10 +28,9 @@
   let panel: HTMLElement;
   let opener: HTMLElement | null = null;
 
+  const family = 'maia3' as const;
   const covered = $derived(models.coveredLevels(family));
   const playable = $derived(models.playableLevels(family));
-  const pack = $derived(models.packFor(family));
-  const info = $derived(modelInfo(family));
   const canPlay = $derived(playable.includes(level));
   // A model the website installs by itself may still be on its way: show that instead of sending
   // the player to the Models screen.
@@ -49,14 +45,7 @@
   });
   const speed = $derived(SPEED_LABEL[speedOf(timeControl)]);
 
-  // Pick a model that covers this persona's level, and snap the level to what it covers.
-  $effect.pre(() => {
-    const lv = models.coveredLevels(family);
-    if (!lv.length) {
-      const alt = MODELS.find((m) => models.coveredLevels(m.family).length);
-      if (alt) family = alt.family;
-    }
-  });
+  // Snap the level to what the model covers.
   $effect.pre(() => {
     const snapped = nearestLevel(covered, level || (custom ? (prefs.customLevel ?? persona.level) : persona.level));
     if (snapped !== null && snapped !== level) level = snapped;
@@ -87,7 +76,7 @@
   }
 
   function remember() {
-    savePrefs({ family, colour, timeControl, rated, ...(custom ? { customLevel: level } : prefs.customLevel ? { customLevel: prefs.customLevel } : {}) });
+    savePrefs({ colour, timeControl, rated, ...(custom ? { customLevel: level } : prefs.customLevel ? { customLevel: prefs.customLevel } : {}) });
   }
 
   function focusables(): HTMLElement[] {
@@ -134,13 +123,6 @@
     label: formatTimeControl(tc),
     title: `${SPEED_LABEL[speedOf(tc)]} rating`
   }));
-  const calibrationNote = $derived(
-    family === 'fastelo'
-      ? 'Strength from fastelo’s published calibration, used unchanged. Its move quality matches held-out Lichess rapid games; in bot-vs-bot games, levels between 800 and 1800 play closer together than their labels.'
-      : family === 'maia3'
-        ? 'Strength fitted to held-out Lichess rapid games with fastelo’s method.'
-        : 'Rating buckets from 1100 upward; temperature fitted to held-out Lichess rapid games.'
-  );
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -156,69 +138,39 @@
   transition:scale={{ start: 0.965, duration: 200 * motion, easing: cubicOut, opacity: 0 }}
 >
   <header class="titlebar">
-    <span class="title">{custom ? 'Custom game' : 'Bot profile'}</span>
+    <span class="title">{custom ? 'Custom game' : 'New game'}</span>
     <span class="end">
       <span class="counter" aria-hidden="true">{String(level).padStart(4, '0')}</span>
       <button class="close" data-sound="back" onclick={close}>Close</button>
     </span>
   </header>
   <div class="body">
-  <div class="top">
-    <div class="facts">
-      <h2 id="bot-name" class="name">{persona.name}</h2>
-      <div class="grid">
-        <div class="cell wide">
-          <Toggle
-            legend="Model"
-            value={family}
-            options={MODELS.map((m) => ({
-              value: m.family,
-              label: m.name,
-              disabled: models.coveredLevels(m.family).length === 0,
-              title: models.coveredLevels(m.family).length ? undefined : 'No calibrated levels yet'
-            }))}
-            onchange={(v) => {
-              family = v;
-              remember();
-            }}
-          />
-        </div>
-        <div class="cell">
-          <span class="label" id="rating-label">Rating (Lichess rapid)</span>
-          <div class="stepper" role="group" aria-labelledby="rating-label">
-            <button onclick={() => step(-1)} aria-label="Lower rating" disabled={level <= Math.min(...covered)}>−</button>
-            <span class="value big" aria-live="polite">{level}</span>
-            <button onclick={() => step(1)} aria-label="Higher rating" disabled={level >= Math.max(...covered)}>+</button>
-          </div>
-        </div>
-        <LabelValue label="Model pack" value={pack ? `${pack.id} · verified` : `${info.pack} · not installed`} />
-        <div class="cell wide">
-          <LabelValue label="Style" value={info.style} />
+    <h2 id="bot-name" class="name">{persona.name}</h2>
+    {#if !custom}<p class="bio">{persona.bio}</p>{/if}
+
+    <div class="settings">
+      <div class="cell">
+        <span class="label" id="rating-label">Rating</span>
+        <div class="stepper" role="group" aria-labelledby="rating-label">
+          <button onclick={() => step(-1)} aria-label="Lower rating" disabled={!covered.length || level <= Math.min(...covered)}>−</button>
+          <span class="value big" aria-live="polite">{level || '—'}</span>
+          <button onclick={() => step(1)} aria-label="Higher rating" disabled={!covered.length || level >= Math.max(...covered)}>+</button>
         </div>
       </div>
-    </div>
-    <div class="portrait">
-      <DitherTile subject={persona.subject} promotion={ui.promotion} label="{persona.name}, dithered portrait" />
-    </div>
-  </div>
-  <hr />
-  <div class="bottom">
-    <p class="bio">{persona.bio} <span class="note">{calibrationNote}</span></p>
-    <div class="actions">
-      <div class="toggles">
-        <Toggle
-          legend="Colour"
-          value={colour}
-          options={[
-            { value: 'white' as const, label: 'White' },
-            { value: 'random' as const, label: 'Random' },
-            { value: 'black' as const, label: 'Black' }
-          ]}
-          onchange={(v) => {
-            colour = v;
-            remember();
-          }}
-        />
+      <Toggle
+        legend="Colour"
+        value={colour}
+        options={[
+          { value: 'white' as const, label: 'White' },
+          { value: 'random' as const, label: 'Random' },
+          { value: 'black' as const, label: 'Black' }
+        ]}
+        onchange={(v) => {
+          colour = v;
+          remember();
+        }}
+      />
+      <div class="cell wide">
         <Toggle
           legend="Clock · {speed}"
           value={timeControl}
@@ -229,35 +181,35 @@
             remember();
           }}
         />
-        <Toggle
-          legend="Game"
-          value={rated}
-          options={[
-            { value: true, label: 'Rated', title: `Counts for your ${speed.toLowerCase()} rating` },
-            { value: false, label: 'Casual', title: 'Does not count for any rating' }
-          ]}
-          onchange={(v) => {
-            rated = v;
-            remember();
-          }}
-        />
       </div>
-      <button
-        class="play"
-        data-sound="confirm"
-        onclick={play}
-        disabled={waiting}
-        aria-busy={waiting}
-        onpointerenter={() => (ui.promotion = true)}
-        onpointerleave={() => (ui.promotion = false)}
-        onfocus={() => (ui.promotion = true)}
-        onblur={() => (ui.promotion = false)}
-      >
-        {playLabel}
-      </button>
+      <Toggle
+        legend="Game"
+        value={rated}
+        options={[
+          { value: true, label: 'Rated', title: `Counts for your ${speed.toLowerCase()} rating` },
+          { value: false, label: 'Casual', title: 'Does not count for any rating' }
+        ]}
+        onchange={(v) => {
+          rated = v;
+          remember();
+        }}
+      />
     </div>
+
+    <button
+      class="play"
+      onclick={play}
+      disabled={waiting}
+      aria-busy={waiting}
+      data-sound="confirm"
+      onpointerenter={() => (ui.promotion = true)}
+      onpointerleave={() => (ui.promotion = false)}
+      onfocus={() => (ui.promotion = true)}
+      onblur={() => (ui.promotion = false)}
+    >
+      {playLabel}
+    </button>
   </div>
-</div>
 </div>
 
 <style>
@@ -273,7 +225,7 @@
     left: 50%;
     top: 50%;
     translate: -50% -50%;
-    width: min(920px, calc(100vw - 2 * var(--gutter)));
+    width: min(640px, calc(100vw - 2 * var(--gutter)));
     max-height: calc(100dvh - 2 * var(--gutter));
     display: flex;
     flex-direction: column;
@@ -292,20 +244,11 @@
     min-height: 0;
     overflow-y: auto;
     padding: 22px 26px 26px;
-  }
-  hr {
-    border: 0;
-    border-top: var(--hairline) solid var(--panel-muted);
-    margin: 16px 0 22px;
-    opacity: 0.6;
-  }
-  .top {
     display: grid;
-    grid-template-columns: 1fr minmax(180px, 250px);
-    gap: 32px;
+    gap: 22px;
   }
   .name {
-    margin: 0 0 26px;
+    margin: 0;
     font-family: var(--font-display);
     font-weight: 800;
     font-stretch: var(--display-stretch);
@@ -314,10 +257,20 @@
     letter-spacing: -0.01em;
     text-transform: uppercase;
   }
-  .grid {
+  .bio {
+    margin: -8px 0 0;
+    color: var(--panel-muted);
+    font-size: var(--ui-size-small);
+    text-transform: none;
+    letter-spacing: 0.03em;
+    max-width: 60ch;
+  }
+  .settings {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 22px 28px;
+    padding-top: 18px;
+    border-top: var(--hairline) solid color-mix(in srgb, var(--panel-muted) 60%, transparent);
   }
   .cell.wide {
     grid-column: 1 / -1;
@@ -343,44 +296,13 @@
     cursor: not-allowed;
   }
   .big {
-    font-size: 22px;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 26px;
     min-width: 4ch;
     text-align: center;
   }
-  .bottom {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 32px;
-    align-items: end;
-  }
-  .bio {
-    margin: 0;
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-stretch: 100%;
-    font-size: 15px;
-    line-height: 1.32;
-    letter-spacing: 0.01em;
-    text-transform: uppercase;
-    color: var(--panel-muted);
-    max-width: 54ch;
-  }
-  .note {
-    display: block;
-    margin-top: 10px;
-  }
-  .actions {
-    display: grid;
-    gap: 20px;
-    justify-items: end;
-  }
-  .toggles {
-    display: grid;
-    gap: 14px;
-    justify-items: start;
-  }
   .play {
-    min-width: 240px;
     padding: 16px 26px;
     background: var(--button);
     color: var(--button-ink);
@@ -398,20 +320,9 @@
     cursor: progress;
     opacity: 0.72;
   }
-
-  @media (max-width: 760px) {
-    .top,
-    .bottom {
+  @media (max-width: 560px) {
+    .settings {
       grid-template-columns: 1fr;
-    }
-    .portrait {
-      max-width: 220px;
-    }
-    .actions {
-      justify-items: stretch;
-    }
-    .play {
-      width: 100%;
     }
   }
 </style>

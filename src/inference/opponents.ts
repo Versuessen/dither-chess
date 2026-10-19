@@ -9,18 +9,15 @@ import { createRng } from '../lib/rng';
 import { manager } from '../models/manager.svelte';
 import { defaultPack } from '../models/manifest';
 import { models } from '../models/state.svelte';
-import { fasteloSettings, tableSettings, type FasteloCalibration, type LevelSettings, type TableCalibration } from './calibration';
+import { tableSettings, type LevelSettings, type TableCalibration } from './calibration';
 import { inference } from './client';
 import { sample } from './sampler';
-import type { RatingResponse } from '../rating/moveQuality';
 
 export interface LoadedPack {
   id: string;
-  family: 'fastelo' | 'maia3' | 'maia2';
+  family: 'maia3';
   sha256: string;
-  calibration: FasteloCalibration | TableCalibration | null;
-  /** fastelo only: bias correction of the move-quality estimate. */
-  ratingResponse: RatingResponse | null;
+  calibration: TableCalibration | null;
 }
 
 /** Loads in flight (generation null) or done, with the inference worker generation they went into. */
@@ -36,14 +33,13 @@ export function loadPack(id: string): Promise<LoadedPack> {
   const entry: { promise: Promise<LoadedPack>; generation: number | null } = { promise: Promise.resolve(null as never), generation: null };
   entry.promise = (async () => {
     const dpk = await manager.openPack(id);
-    const family = dpk.header.family;
+    if (dpk.header.family !== 'maia3') throw new Error(`${id} is not a Maia-3 pack`);
     const [model, vocab] = await Promise.all([dpk.file('model.onnx'), dpk.json<string[]>('vocab.json')]);
-    const calibration = dpk.has('calibration.json') ? await dpk.json<FasteloCalibration | TableCalibration>('calibration.json') : null;
-    const ratingResponse = dpk.has('rating_response.json') ? await dpk.json<RatingResponse>('rating_response.json') : null;
-    await inference.load(id, family, model, vocab);
+    const calibration = dpk.has('calibration.json') ? await dpk.json<TableCalibration>('calibration.json') : null;
+    await inference.load(id, model, vocab);
     entry.generation = inference.generation;
     const pack = models.installed.find((x) => x.id === id);
-    return { id, family, sha256: pack?.sha256 ?? '', calibration, ratingResponse };
+    return { id, family: 'maia3' as const, sha256: pack?.sha256 ?? '', calibration };
   })();
   entry.promise.catch(() => {
     if (loaded.get(id) === entry) loaded.delete(id);
@@ -54,13 +50,7 @@ export function loadPack(id: string): Promise<LoadedPack> {
 
 export function settingsFor(pack: LoadedPack, level: number): LevelSettings {
   if (!pack.calibration) throw new Error(`${pack.id} has no calibration; no level is playable yet.`);
-  if (pack.family === 'fastelo') {
-    const s = fasteloSettings(pack.calibration as FasteloCalibration, level);
-    // The strong player only joins above 2100; the app never goes there.
-    if (s.mix > 0) throw new Error(`fastelo level ${level} needs the strong player, which is not shipped`);
-    return s;
-  }
-  const s = tableSettings(pack.calibration as TableCalibration, level);
+  const s = tableSettings(pack.calibration, level);
   if (!s) throw new Error(`${pack.id} is not calibrated for ${level}.`);
   return s;
 }

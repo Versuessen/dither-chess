@@ -23,7 +23,7 @@ test('inference falls back to one thread when WebAssembly thread workers cannot 
     await page.goto('/#/models');
     await expect(page.locator('.pre')).toHaveCount(0, { timeout: 30_000 });
     expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
-    const row = page.locator('[data-pack="fastelo-7m"]');
+    const row = page.locator('[data-pack="maia3-23m"]');
     await row.getByRole('button', { name: 'Download' }).click();
     await expect(row).toContainText('verified', { timeout: 5 * 60_000 });
 
@@ -42,6 +42,10 @@ test('inference falls back to one thread when WebAssembly thread workers cannot 
     // The thread workers really were refused, and the app says what it did about it.
     const hook = (await (await request.get('/__test/refuse-thread-workers')).json()) as { refused: number };
     expect(hook.refused).toBeGreaterThan(0);
+    // The runtime details are developer information: switch it on with the © on the home screen.
+    await page.goto('/#/');
+    await page.locator('button.year').click();
+    await expect(page.locator('button.year')).toHaveAttribute('aria-pressed', 'true');
     await page.goto('/#/settings');
     await expect(page.getByText(/inference on WebAssembly, 1 thread\b/)).toBeVisible();
     await expect(page.getByTestId('single-thread-reason')).toContainText(/WebAssembly thread/);

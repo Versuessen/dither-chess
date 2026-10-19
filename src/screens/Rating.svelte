@@ -5,7 +5,6 @@
   import Toggle from '../ui/Toggle.svelte';
   import { rating, ratingLabel } from '../rating/rating.svelte';
   import { RULES } from '../rating/fide';
-  import { combine, quote, type QualityMeasurement } from '../rating/moveQuality';
   import { storage } from '../storage';
   import type { StoredGame } from '../storage/types';
   import { href } from '../app/router.svelte';
@@ -51,9 +50,6 @@
   const live = $derived(r && r.periods.length ? r.periods[r.periods.length - 1]! : null);
   const unratedNow = $derived(!!r && r.published === null);
   const provisional = $derived(live?.initial ?? null);
-  const fideInitial = $derived(
-    r && unratedNow && s && s.hypotheticalOpponent !== 1800 ? rating.preview(speed, { hypotheticalOpponent: 1800 }).periods.at(-1)?.initial ?? null : null
-  );
 
   // History graph: the rating at the end of every period, plus the live point.
   const points = $derived.by(() => {
@@ -82,24 +78,6 @@
     for (let v = lo; v <= hi; v += hi - lo > 400 ? 200 : 100) ticks.push({ v, y: y(v) });
     return { W, H, path, livePath, dots: points.map((p, i) => ({ ...p, x: x(i), y: y(p.value) })), ticks };
   });
-
-  const quality = $derived(
-    combine(
-      games
-        .filter((g) => g.quality)
-        .sort((a, b) => (a.endedAt ?? '').localeCompare(b.endedAt ?? ''))
-        .map(
-          (g): QualityMeasurement => ({
-            mean: g.quality!.mean,
-            minus: g.quality!.minus,
-            plus: g.quality!.plus,
-            syst: g.quality!.syst,
-            resolution: g.quality!.resolution,
-            userMoves: g.quality!.userMoves
-          })
-        )
-    )
-  );
 
   function saveHypo() {
     const v = Math.round(Number(hypo));
@@ -147,14 +125,8 @@
 
     {#if unratedNow}
       <p class="note">
-        A rating is published once at least {RULES.initialGames} rated {SPEED_LABEL[speed].toLowerCase()} games, played within {RULES.poolMonths} months,
-        are pooled: the average of your opponents plus two hypothetical opponents rated {s?.hypotheticalOpponent}, counted
-        as draws, plus the FIDE table value for your score (FIDE 7.2). It appears on the list at the start of the next month.
-        {#if provisional}
-          From your {provisional.games} games: average {Math.round(provisional.average * 10) / 10}, score {Math.round(provisional.p * 100)}%,
-          dp {fmt(provisional.dp)}, so {provisional.rating}{provisional.capped ? ' (capped at 2200)' : ''}.
-          {#if fideInitial}With FIDE's 1800 it would be {fideInitial.rating}.{/if}
-        {/if}
+        {RULES.initialGames} rated games give a first rating, published on {nextList}.
+        {#if provisional}So far: {provisional.rating}{provisional.capped ? ' (capped at 2200)' : ''} from {provisional.games} games.{/if}
       </p>
       {#each live?.notes ?? [] as n (n)}<p class="note">{n}</p>{/each}
     {/if}
@@ -178,11 +150,7 @@
     <section aria-labelledby="ledger-title">
       <h2 id="ledger-title" class="label">Rating periods</h2>
       {#if r.periods.every((p) => p.games.length === 0)}
-        <p class="note">
-          No rated {SPEED_LABEL[speed].toLowerCase()} games yet. Each speed has its own rating: bullet, blitz, rapid, and classical (which
-          includes untimed games). A game is rated when you choose Rated before it starts, take nothing back and both sides have moved;
-          aborted games never count, and History can take any game out of the rating. <a href={href({ name: 'home' })}>Pick an opponent</a>.
-        </p>
+        <p class="note">No rated {SPEED_LABEL[speed].toLowerCase()} games yet. <a href={href({ name: 'home' })}>Play one</a>.</p>
       {:else}
         <table>
           <thead>
@@ -239,32 +207,13 @@
       {/if}
     </section>
 
-    <section aria-labelledby="quality-title">
-      <h2 id="quality-title" class="label">Move quality (separate from the rating)</h2>
-      {#if quality}
-        <p class="q">
-          <span class="q-value">{quote(quality.value)}</span>
-          <span class="note">
-            −{Math.round(quality.minus)}/+{Math.round(quality.plus)} statistical, ±{Math.round(quality.syst)} systematic · fastelo estimate from
-            the moves of your last {quality.games} games. It says what your moves look like, not your results, and is quoted only between 600
-            and 2200.
-          </span>
-        </p>
-      {:else}
-        <p class="note">After each game the fastelo model estimates the rating your moves look like. Install the fastelo pack to see it.</p>
-      {/if}
-    </section>
-
     <section aria-labelledby="settings-title">
       <h2 id="settings-title" class="label">Deviations from FIDE</h2>
       <div class="settings">
         <div>
           <label class="label" for="hypo">Hypothetical opponents (FIDE: 1800)</label>
           <input id="hypo" inputmode="numeric" bind:value={hypo} onchange={saveHypo} />
-          <p class="note">
-            Used for an initial rating from the month it is changed.
-            {#if r.published !== null}You are already rated, so it no longer changes anything.{/if}
-          </p>
+          {#if r.published !== null}<p class="note">No effect once you are rated.</p>{/if}
         </div>
         <div>
           <Toggle
@@ -276,15 +225,14 @@
             ]}
             onchange={(v) => void rating.changeSettings({ floor1400: v })}
           />
-          <p class="note">On: ratings under 1400 are not published, as in FIDE lists. Off (default): every rating counts.</p>
+
         </div>
         <div>
           <label class="label" for="birth">Birth year for the junior K (optional)</label>
           <input id="birth" inputmode="numeric" placeholder="none" bind:value={birth} onchange={saveBirth} />
-          <p class="note">FIDE gives K = 40 until the end of the year of the 18th birthday while the rating is under 2300.</p>
+
         </div>
       </div>
-      <p class="note">Changes are added to the rating ledger and apply from the current month; past months are never recomputed.</p>
     </section>
   {/if}
 </ScreenFrame>
@@ -401,17 +349,6 @@
     padding: 0 0 0 1em;
     text-transform: none;
     letter-spacing: 0.04em;
-  }
-  .q {
-    display: grid;
-    gap: 6px;
-    margin: 0;
-  }
-  .q-value {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 32px;
-    text-transform: uppercase;
   }
   .settings {
     display: grid;

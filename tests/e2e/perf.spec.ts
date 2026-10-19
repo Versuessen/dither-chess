@@ -5,7 +5,7 @@ import { Chess } from 'chess.js';
  * Performance budgets (DECISIONS.md, Phase 7), measured on the production build:
  *  - start-up with everything cached (service worker): preloader gone within 3 s;
  *  - JavaScript on the first screen: at most 400 kB (transfer, uncompressed by the preview server);
- *  - one bot move (fastelo forward pass in the worker, WASM): median ≤ 150 ms, 95th percentile ≤ 400 ms,
+ *  - one bot move (Maia-3 23M forward pass in the worker, WASM): median ≤ 150 ms, 95th percentile ≤ 400 ms,
  *    over 24 moves.
  * The numbers are printed so CI logs keep a record.
  */
@@ -52,7 +52,7 @@ test('meets the start-up and inference budgets', async ({ page }) => {
   const warm = await bootTime(page);
 
   await page.goto('/#/models');
-  const row = page.locator('[data-pack="fastelo-7m"]');
+  const row = page.locator('[data-pack="maia3-23m"]');
   await row.getByRole('button', { name: 'Download' }).click();
   await expect(row).toContainText('verified', { timeout: 5 * 60_000 });
   await page.goto('/#/settings');

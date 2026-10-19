@@ -15,7 +15,7 @@ test('works without a connection after the first visit', async ({ page, context 
   }, null, { timeout: 60_000 });
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
 
-  const row = page.locator('[data-pack="fastelo-7m"]');
+  const row = page.locator('[data-pack="maia3-23m"]');
   await row.getByRole('button', { name: 'Download' }).click();
   await expect(row).toContainText('verified', { timeout: 5 * 60_000 });
 
@@ -28,7 +28,7 @@ test('works without a connection after the first visit', async ({ page, context 
     expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
 
     await page.goto('/#/models');
-    await expect(page.locator('[data-pack="fastelo-7m"]')).toContainText('verified', { timeout: 60_000 });
+    await expect(page.locator('[data-pack="maia3-23m"]')).toContainText('verified', { timeout: 60_000 });
 
     await page.goto('/#/bot/grinder');
     const panel = page.getByRole('dialog');
