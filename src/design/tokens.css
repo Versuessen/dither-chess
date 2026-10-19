@@ -1,0 +1,183 @@
+/*
+ * DITHER design tokens. Every colour used by the app is defined here and nowhere else.
+ * The dither renderer reads the --dither-* tokens at runtime, so the WebGL layer and the
+ * chrome can never drift apart. tests/unit/contrast.test.ts parses this file and checks
+ * WCAG AA for every text token against every ink it can sit on.
+ *
+ * Palette idea: a duplicate chess scoresheet. The carbonless copy is yellow, the pen and
+ * the carbon are blue-violet. Light theme: blue shadows, yellow light. Dark theme: black
+ * shadows, carbon-blue light, violet kept as a thin tint in the brightest line cores.
+ */
+
+@font-face {
+  font-family: 'Departure Mono';
+  src: url('/fonts/DepartureMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Archivo';
+  src: url('/fonts/archivo-latin-wdth-normal.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: block;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+    U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Archivo';
+  src: url('/fonts/archivo-latin-ext-wdth-normal.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: block;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Archivo';
+  src: url('/fonts/archivo-latin-wdth-italic.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-style: italic;
+  font-display: block;
+}
+
+:root {
+  /* ---- type ------------------------------------------------------------------------- */
+  --font-ui: 'Departure Mono', ui-monospace, monospace;
+  --font-display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  --ui-size: 14px;
+  --ui-size-small: 12px;
+  --ui-tracking: 0.12em;
+  --display-size: clamp(38px, 4.5vw, 66px);
+  --display-leading: 0.95;
+  --display-weight: 800;
+  --display-stretch: 92%;
+  --clock-size: clamp(44px, 6vw, 84px);
+  --name-size: clamp(32px, 3.4vw, 52px);
+
+  /* ---- space and shape --------------------------------------------------------------- */
+  --gutter: clamp(16px, 2.2vw, 32px);
+  --radius: 3px;
+  --hairline: 1px;
+  --row-shift: 16px;
+
+  /* ---- motion ------------------------------------------------------------------------ */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-snap: cubic-bezier(0.65, 0, 0.35, 1);
+  --t-fast: 140ms;
+  --t-panel: 220ms;
+  --t-dissolve: 400ms;
+
+  /* ---- fixed accent (one per app): the clock flag ------------------------------------ */
+  --flag: #e5391f;
+
+  color-scheme: light dark;
+}
+
+/* ---- light: ink on paper, yellow-copy light over carbon-blue shadow -------------------- */
+:root,
+:root[data-theme='light'] {
+  --paper: #f5f5f2;
+  --ink: #121212;
+  --ink-muted: #5c5c5c;
+  --ink-faint: #8d8d8a;
+  --rule: #121212;
+  --panel: #f5f5f2;
+  --panel-ink: #121212;
+  --panel-muted: #5c5c5c;
+  --button: #121212;
+  --button-ink: #f5f5f2;
+  --list-row: rgba(18, 18, 18, 0.86);
+  --list-row-hover: #000000;
+  --over-dither: #121212;
+  --over-dither-muted: rgba(18, 18, 18, 0.9);
+  --scrim: rgba(245, 245, 242, 0.55);
+
+  --dither-shadow: #7486f7;
+  --dither-light: #f1de52;
+  --dither-bleed: #f0a93a;
+  --dither-tint: #f1de52;
+  --dither-tint-amount: 0;
+  --dither-grain: 0.07;
+
+  --sq-classic-light: #ecebe5;
+  --sq-classic-dark: #a8a294;
+  --sq-duo-light: #f1de52;
+  --sq-duo-dark: #7486f7;
+
+  --text-halo: none;
+}
+
+/* ---- dark: the inverse chrome, carbon-blue light over black ---------------------------- */
+:root[data-theme='dark'] {
+  --paper: #0a0a0a;
+  --ink: #ededed;
+  --ink-muted: #8c8c8c;
+  --ink-faint: #5a5a5a;
+  --rule: #ededed;
+  --panel: #0a0a0a;
+  --panel-ink: #ededed;
+  --panel-muted: #8c8c8c;
+  --button: #e6e6e6;
+  --button-ink: #0a0a0a;
+  --list-row: rgba(230, 230, 230, 0.88);
+  --list-row-hover: #ffffff;
+  --over-dither: #ededed;
+  --over-dither-muted: rgba(237, 237, 237, 0.9);
+  --scrim: rgba(10, 10, 10, 0.55);
+
+  --dither-shadow: #0a0a0a;
+  --dither-light: #3a3cf2;
+  --dither-bleed: #6a2bea;
+  --dither-tint: #7b3dff;
+  --dither-tint-amount: 1;
+  --dither-grain: 0.09;
+
+  --sq-classic-light: #bdbab1;
+  --sq-classic-dark: #6e6a61;
+  --sq-duo-light: #8a8cf5;
+  --sq-duo-dark: #3a3cf2;
+
+  --text-halo: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #0a0a0a;
+    --ink: #ededed;
+    --ink-muted: #8c8c8c;
+    --ink-faint: #5a5a5a;
+    --rule: #ededed;
+    --panel: #0a0a0a;
+    --panel-ink: #ededed;
+    --panel-muted: #8c8c8c;
+    --button: #e6e6e6;
+    --button-ink: #0a0a0a;
+    --list-row: rgba(230, 230, 230, 0.88);
+    --list-row-hover: #ffffff;
+    --over-dither: #ededed;
+    --over-dither-muted: rgba(237, 237, 237, 0.9);
+    --scrim: rgba(10, 10, 10, 0.55);
+
+    --dither-shadow: #0a0a0a;
+    --dither-light: #3a3cf2;
+    --dither-bleed: #6a2bea;
+    --dither-tint: #7b3dff;
+    --dither-tint-amount: 1;
+    --dither-grain: 0.09;
+
+    --sq-classic-light: #bdbab1;
+    --sq-classic-dark: #6e6a61;
+    --sq-duo-light: #8a8cf5;
+    --sq-duo-dark: #3a3cf2;
+
+    --text-halo: none;
+  }
+}

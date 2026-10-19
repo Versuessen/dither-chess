@@ -1,0 +1,24 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.DS_Store
+coverage/
+test-results/
+playwright-report/
+blob-report/
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Python tools
+tools/**/.venv/
+tools/**/__pycache__/
+tools/**/*.egg-info/
+tools/**/.pytest_cache/
+tools/models/work/
+tools/calibrate/work/
+
+# Model packs are release assets, not source
+models/packs/

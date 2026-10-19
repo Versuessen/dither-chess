@@ -1,0 +1,56 @@
+DITHER
+Copyright (C) 2026 Jonas Bluhm and contributors.
+
+This program is free software: you can redistribute it and/or modify it under the terms of
+the GNU Affero General Public License as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version. See LICENSE.
+
+The project is AGPL-3.0 because it distributes the Maia-3 model (AGPL-3.0) and the fastelo
+model (GPL-3.0). Third-party components and data are listed below with their licences.
+
+------------------------------------------------------------------------------------------
+Fonts (bundled in public/fonts)
+------------------------------------------------------------------------------------------
+Departure Mono 1.500            SIL Open Font License 1.1   (c) 2022-2024 Helena Zhang
+  https://github.com/rektdeckard/departure-mono      licence: public/fonts/DepartureMono-OFL.txt
+Archivo (variable, wdth/wght)    SIL Open Font License 1.1   (c) 2020 The Archivo Project Authors
+  via @fontsource-variable/archivo 5.3.0              licence: public/fonts/Archivo-OFL.txt
+
+------------------------------------------------------------------------------------------
+Software (bundled in the app)
+------------------------------------------------------------------------------------------
+chess.js 1.4.0                   BSD-2-Clause                (c) 2025 Jeff Hlywa
+chessground 9.2.1                GPL-3.0-or-later            (c) lichess.org contributors
+onnxruntime-web 1.30.0           MIT                         (c) Microsoft Corporation
+svelte 5                         MIT                         (c) Svelte contributors
+
+------------------------------------------------------------------------------------------
+Models (downloaded or bundled as model packs; see models/manifest.json)
+------------------------------------------------------------------------------------------
+fastelo                          GPL-3.0                     irsotarriva
+  https://huggingface.co/irsotarriva/fastelo   code: https://github.com/irsotarriva/fastelo
+  Trained on the Lichess open database (CC0); distilled from Leela Chess Zero
+  T1-256x10-distilled-swa-2432500 (GPL-3.0), which is not redistributed.
+Maia-3                           AGPL-3.0 (code and weights) University of Toronto CSSLab
+  https://huggingface.co/UofTCSSLab/Maia3-5M   code: https://github.com/CSSLab/maia3
+  Paper: Monroe, Eilender, Chalmers, Tang, Anderson. "Chessformer: A Unified Architecture
+  for Chess Modeling." ICLR 2026.
+Maia-2 (rapid)                   MIT                         University of Toronto CSSLab
+  https://github.com/CSSLab/maia2; ONNX export from
+  https://github.com/CSSLab/maia-platform-frontend (GPL-3.0)
+  Paper: Tang, Jiao, McIlroy-Young, Kleinberg, Sen, Anderson. "Maia-2: A Unified Model for
+  Human-AI Alignment in Chess." NeurIPS 2024.
+
+------------------------------------------------------------------------------------------
+Data and tools (not bundled)
+------------------------------------------------------------------------------------------
+Lichess open database            CC0                         https://database.lichess.org/
+  Used by tools/calibrate for held-out positions and opening books.
+Stockfish                        GPL-3.0                     https://stockfishchess.org/
+  Used by tools/calibrate only, to measure move quality. Never an opponent.
+
+------------------------------------------------------------------------------------------
+Images
+------------------------------------------------------------------------------------------
+All subject images in public/art and the icons in public/icons are rendered by this
+project (tools/art, original SDF models) and are covered by the project licence.

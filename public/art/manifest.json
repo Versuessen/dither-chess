@@ -1,0 +1,130 @@
+{
+  "scenes": {
+    "hero": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.48,
+        0.45
+      ]
+    },
+    "pawn-crown": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.5,
+        0.42
+      ]
+    },
+    "coronet": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.5,
+        0.5
+      ]
+    },
+    "knight-profile": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.52,
+        0.45
+      ]
+    },
+    "rook-crown": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.5,
+        0.35
+      ]
+    },
+    "mitre": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.5,
+        0.45
+      ]
+    },
+    "board-rake": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.5,
+        0.6
+      ]
+    },
+    "kings-cross": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.5,
+        0.45
+      ]
+    },
+    "pawn-chain": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.45,
+        0.5
+      ]
+    },
+    "outpost": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.5,
+        0.5
+      ]
+    },
+    "toppled-king": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.45,
+        0.5
+      ]
+    },
+    "queen-tower": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.5,
+        0.4
+      ]
+    },
+    "king-queen": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.5,
+        0.45
+      ]
+    },
+    "citadel": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.5,
+        0.4
+      ]
+    },
+    "fork": {
+      "width": 1280,
+      "height": 800,
+      "focal": [
+        0.5,
+        0.5
+      ]
+    }
+  },
+  "morph": {
+    "frames": 12,
+    "cols": 4,
+    "frameWidth": 320,
+    "frameHeight": 448
+  }
+}
