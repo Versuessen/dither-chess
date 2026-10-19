@@ -36,8 +36,8 @@ jobs:
   models:
     # Converts, verifies (parity on 2,016 positions) and packs the models from pinned sources: a
     # check that the pipeline still reproduces them. The other jobs, and the web app on Pages, use
-    # the packs published in the `models-v<version>` release, which models/manifest.json pins by
-    # SHA-256 (a rebuilt pack embeds this run's parity report, so its checksum differs).
+    # the committed packs, which models/manifest.json pins by SHA-256 (a rebuilt pack embeds this
+    # run's parity report, so its checksum differs).
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -83,7 +83,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Model packs from the release (SHA-256 checked against models/manifest.json)
+      - name: Model packs (SHA-256 checked against models/manifest.json)
         run: pnpm models:fetch
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
@@ -113,7 +113,7 @@ jobs:
         with:
           workspaces: src-tauri
       - run: pnpm install --frozen-lockfile
-      - name: Model packs from the release (SHA-256 checked against models/manifest.json)
+      - name: Model packs (SHA-256 checked against models/manifest.json)
         run: pnpm models:fetch
       - name: Build NSIS and MSI installers
         shell: pwsh
@@ -148,7 +148,7 @@ jobs:
           npm install -g corepack && corepack enable
       - uses: actions/checkout@v6
       - run: pnpm install --frozen-lockfile
-      - name: Model packs from the release (SHA-256 checked against models/manifest.json)
+      - name: Model packs (SHA-256 checked against models/manifest.json)
         run: pnpm models:fetch
       - name: Build RPM and AppImage
         env:

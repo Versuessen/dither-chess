@@ -1,7 +1,7 @@
 /**
  * Vite plugin: copies the model packs listed in models/manifest.json into <outDir>/models/packs,
- * so a static web host serves them from the same origin (the browser's download mirror; GitHub
- * release assets carry no CORS headers). Packs are never precached by the service worker.
+ * so a static web host serves them from the same origin (the isolated page cannot rely on
+ * cross-origin downloads). Packs are never precached by the service worker.
  *
  * Desktop builds skip the copy (the Tauri CLI sets TAURI_ENV_PLATFORM for its build command):
  * packs are downloaded in Rust, or bundled as resources by the full-offline variant. Setting

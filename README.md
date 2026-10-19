@@ -80,7 +80,7 @@ pnpm tauri build --config src-tauri/tauri.offline.conf.json   # full-offline bui
 ```bash
 pnpm test           # unit tests: rules, clocks, PGN, rating, storage, encoders, model parity, packs
 pnpm check          # strict type check
-pnpm models:fetch   # the model packs models/manifest.json pins, from the release (SHA-256 checked)
+pnpm models:fetch   # check models/packs against models/manifest.json (SHA-256), fetch what is missing
 pnpm test:e2e       # Playwright on the production build: a full rated game per model, offline session,
                     # WCAG 2.1 AA (axe) and keyboard play, performance budgets, themes, reduced motion
 pnpm test:pages     # the GitHub Pages build: sub-path, no COOP/COEP, service-worker isolation, offline
@@ -88,20 +88,22 @@ pnpm test:pages     # the GitHub Pages build: sub-path, no COOP/COEP, service-wo
 
 The model-parity tests run the exported ONNX models through onnxruntime-web when they are present in
 `tools/models/work/onnx` (`DITHER_REQUIRE_MODELS=1` makes their absence an error). End-to-end tests
-need the model packs in `models/packs` (`pnpm models:fetch`) and a Chromium
+need the model packs in `models/packs` (committed; `pnpm models:fetch` checks them) and a Chromium
 (`pnpm exec playwright install chromium`, or point `DITHER_CHROMIUM` at one).
 
 ### Website (GitHub Pages)
 
 `.github/workflows/pages.yml` publishes the web app on every push to `main`: it builds for the
-repository's sub-path (`DITHER_BASE=/<repository>/`), takes the model packs from the
-`models-v<version>` release, runs the type check, the unit tests and `test:pages` against the very
-files it is about to publish, then deploys them. In the repository settings, Pages' source must be
-**GitHub Actions**. The packs are served from the same site, because the isolated page cannot load
-GitHub's release downloads directly.
+repository's sub-path (`DITHER_BASE=/<repository>/`) with the committed model packs (checked
+against `models/manifest.json`), runs the type check, the unit tests and `test:pages` against the
+very files it is about to publish, then deploys them. In the repository settings, Pages' source
+must be **GitHub Actions**. The site serves the packs itself, because the isolated page cannot rely
+on cross-origin downloads; the desktop app downloads them from the site too, or from the repository
+at the tag `models-v<version>`.
 
-New model packs: build them (`pnpm models:all`), upload the `.dpk` files to a release tagged
-`models-v<version>`, and commit the regenerated `models/manifest.json`.
+New model packs: build them (`pnpm models:all` with `GITHUB_REPOSITORY=<owner>/<repository>` set,
+so the manifest lists the right download addresses), commit `models/packs` and
+`models/manifest.json`, and push the tag `models-v<version>` on that commit.
 
 ### Models
 

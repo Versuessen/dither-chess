@@ -22,8 +22,8 @@ tools/**/.pytest_cache/
 tools/models/work/
 tools/calibrate/work/
 
-# Model packs are release assets, not source
-models/packs/
+# Model packs (models/packs/*.dpk) are tracked: the website and the desktop app download them from
+# this repository, pinned by models/manifest.json.
 
 # Local signing output (sign-rpm.sh); the published key lives on the release page
 packaging/linux/out/

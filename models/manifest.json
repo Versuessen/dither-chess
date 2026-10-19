@@ -1,7 +1,8 @@
 {
   "format": 1,
   "sources": [
-    "https://github.com/Versuessen/dither-chess/releases/download/models-v1.0.0/",
+    "https://versuessen.github.io/dither-chess/models/packs/",
+    "https://raw.githubusercontent.com/Versuessen/dither-chess/models-v1.0.0/models/packs/",
     "models/packs/"
   ],
   "packs": [

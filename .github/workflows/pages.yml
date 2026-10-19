@@ -1,7 +1,7 @@
 # The web app on GitHub Pages: https://<owner>.github.io/<repository>/
 #
 # Builds the web app for the repository's sub-path with the model packs that models/manifest.json
-# pins (fetched from the `models-v<version>` release, SHA-256 checked), tests that exact build
+# pins (committed in models/packs, SHA-256 checked), tests that exact build
 # the way Pages serves it (sub-path, no COOP/COEP: isolation comes from the service worker),
 # and deploys it. Pages must be set to "GitHub Actions" as its source (Settings → Pages).
 name: pages
@@ -37,7 +37,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm test
-      - name: Model packs from the release
+      - name: Model packs (SHA-256 checked against models/manifest.json)
         run: pnpm models:fetch
       - name: Build for ${{ env.DITHER_BASE }}
         run: pnpm build
