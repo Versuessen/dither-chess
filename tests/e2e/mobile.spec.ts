@@ -22,12 +22,15 @@ test('the home screen is a main menu on a phone', async ({ page }) => {
   const play = page.locator('button.play');
   await expect(play).toBeVisible({ timeout: 30_000 });
   for (const name of ['History', 'Rating', 'Models', 'Settings']) {
-    await expect(page.getByRole('navigation', { name: 'Menu' }).getByRole('link', { name })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name })).toBeVisible();
   }
-  // The roster opens from the menu.
-  await expect(page.locator('[data-persona="grinder"]')).toBeHidden();
-  await page.getByRole('button', { name: 'Opponents' }).tap();
-  await expect(page.locator('[data-persona="grinder"]')).toBeVisible();
+  // The opponents follow under Play, smaller.
+  const first = page.locator('[data-persona="loose-ends"]');
+  await expect(first).toBeVisible();
+  const playSize = await play.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  const rowSize = await first.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  expect(rowSize / playSize).toBeGreaterThan(0.55);
+  expect(rowSize / playSize).toBeLessThan(0.8);
   await noSidewaysScroll(page);
 
   for (const route of ['settings', 'models', 'rating', 'history']) {

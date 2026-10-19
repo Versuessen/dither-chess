@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { PERSONAS, HOME_SUBJECT, CUSTOM, type Persona } from '../bots/personas';
+  import { onMount } from 'svelte';
+  import { PERSONAS, CUSTOM, type Persona } from '../bots/personas';
   import { settings } from '../app/settings.svelte';
   import { ui } from '../app/ui.svelte';
   import { router, href } from '../app/router.svelte';
@@ -15,8 +16,33 @@
   let list: HTMLUListElement;
   let leaveTimer: ReturnType<typeof setTimeout> | undefined;
   let visible = $state(1);
-  /** Phones: the roster opens from the menu. */
-  let rosterOpen = $state(false);
+  /** An opponent is hovered or focused: the background shows it and the rotation pauses. */
+  let pointing = $state(false);
+
+  /**
+   * With nothing pointed at, the background walks through the opponents' scenes, one every few
+   * seconds in a shuffled order (as the reference site rotates its artists' portraits).
+   */
+  const ROTATE_MS = 6500;
+  let order: Persona[] = [];
+  let turn = 0;
+  function nextIdle(): Persona {
+    if (turn % PERSONAS.length === 0) {
+      order = [...PERSONAS].sort(() => Math.random() - 0.5);
+      // Never the same scene twice in a row across a reshuffle.
+      if (order[0]?.subject === ui.subject) order.push(order.shift()!);
+    }
+    return order[turn++ % PERSONAS.length]!;
+  }
+
+  onMount(() => {
+    if (!pointing && !covered) ui.subject = nextIdle().subject;
+    const t = setInterval(() => {
+      if (pointing || covered || ui.reducedMotion || document.hidden) return;
+      ui.subject = nextIdle().subject;
+    }, ROTATE_MS);
+    return () => clearInterval(t);
+  });
 
   function seek(f: number) {
     list.scrollTop = f * (list.scrollHeight - list.clientHeight);
@@ -28,15 +54,15 @@
 
   function show(p: Persona) {
     clearTimeout(leaveTimer);
+    pointing = true;
     ui.subject = p.subject;
   }
 
   function leave() {
     clearTimeout(leaveTimer);
     if (covered) return;
-    leaveTimer = setTimeout(() => {
-      if (!covered) ui.subject = HOME_SUBJECT;
-    }, 900);
+    // A short grace so moving between rows does not restart the rotation.
+    leaveTimer = setTimeout(() => (pointing = false), 900);
   }
 
   function open(p: Persona) {
@@ -66,7 +92,7 @@
   });
 </script>
 
-<div class="home" class:covered class:roster-open={rosterOpen} inert={covered}>
+<div class="home" class:covered inert={covered}>
   <header class="corner top-left">Human-like chess · offline</header>
   <div class="corner top-center wordmark" aria-hidden="true">DITHER</div>
   <nav class="corner top-right" aria-label="Main">
@@ -81,7 +107,7 @@
   </div>
 
   <section class="roster" aria-label="Choose an opponent">
-    <!-- Outside the scrolling list: any model at any rating. -->
+    <!-- The main action, outside the scrolling list: any rating, any settings. -->
     <button
       class="row display play"
       onpointerenter={() => show(CUSTOM)}
@@ -92,11 +118,7 @@
       data-persona={CUSTOM.id}
       data-sound="confirm"
     >
-      <span class="level">Any</span>
       <span class="name">Play</span>
-    </button>
-    <button class="menu-item opponents" aria-expanded={rosterOpen} aria-controls="roster-list" onclick={() => (rosterOpen = !rosterOpen)}>
-      {rosterOpen ? 'Hide opponents' : 'Opponents'}
     </button>
     <ul id="roster-list" bind:this={list} onscroll={onScroll} onpointerleave={leave}>
       {#each PERSONAS as p, i (p.id)}
@@ -120,13 +142,6 @@
 
   <ScrollRail progress={ui.scroll} size={visible} controls="roster-list" label="Opponents" onseek={seek} />
 
-  <nav class="mobile-menu" aria-label="Menu">
-    <a class="menu-item" href={href({ name: 'history' })}>History</a>
-    <a class="menu-item" href={href({ name: 'rating' })}>Rating</a>
-    <a class="menu-item" href={href({ name: 'models' })}>Models</a>
-    <a class="menu-item" href={href({ name: 'settings' })}>Settings</a>
-  </nav>
-
   <!-- The copyright sign also switches the developer details (PGN text and diagnostics) on and off. -->
   <button
     class="corner bottom-left muted year"
@@ -145,6 +160,9 @@
     z-index: 1;
     color: var(--over-dither);
     transition: opacity var(--t-panel) var(--ease-out);
+    /* Play is the main action; the opponents are secondary, about 30% smaller (Overwatch's menu). */
+    --play-size: calc(var(--display-size) * 1.3);
+    --row-size: calc(var(--play-size) * 0.68);
   }
   .home.covered {
     opacity: 0.35;
@@ -209,31 +227,32 @@
     top: 50%;
     transform: translateY(-50%);
     width: min(50vw, 780px);
-    height: min(76vh, 860px);
+    height: min(78vh, 880px);
     display: flex;
     flex-direction: column;
   }
   .play {
     flex: none;
+    font-size: var(--play-size);
   }
-  .play .level {
-    text-transform: uppercase;
-  }
-  /* The list starts a little below the Play button and fades out well before the bottom. */
+  /* The list starts a clear step below Play and fades out well before the bottom. */
   ul {
     flex: 1;
     min-height: 0;
     list-style: none;
-    margin: 1.2vh 0 0;
-    padding: 3vh 0 16vh;
+    margin: 4.5vh 0 0;
+    padding: 2vh 0 16vh;
     overflow-y: auto;
     scrollbar-width: none;
     overscroll-behavior: contain;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 62%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 62%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 62%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 62%, transparent 100%);
   }
   ul::-webkit-scrollbar {
     display: none;
+  }
+  ul .row {
+    font-size: var(--row-size);
   }
   .row {
     display: flex;
@@ -246,6 +265,9 @@
     transition:
       transform var(--t-fast) var(--ease-out),
       color var(--t-fast) linear;
+  }
+  .play.row {
+    color: var(--over-dither);
   }
   .row:hover,
   .row:focus-visible {
@@ -271,82 +293,44 @@
     white-space: nowrap;
   }
 
-  .menu-item {
-    display: block;
-    min-height: 44px;
-    padding: 12px var(--gutter);
-    font-size: var(--ui-size);
-    letter-spacing: var(--ui-tracking);
-    text-align: left;
-    color: var(--over-dither);
-  }
-  /* Phone-only controls. */
-  .menu-item.opponents,
-  .mobile-menu {
-    display: none;
-  }
-
-  /* Phones and narrow windows: a main menu (Play, then the rest), the roster on demand. */
+  /* Phones and narrow windows: the screens across the top, Play, then the opponents below. */
   @media (max-width: 760px) {
     .top-left,
-    .top-right,
     .top-center,
-    .play .level,
     .home :global(.rail) {
       display: none;
     }
-    .play {
-      font-size: 64px;
-    }
-    .top-center {
-      left: var(--gutter);
-      transform: none;
-      padding-left: 0;
+    .top-right {
+      left: 0;
+      justify-content: space-between;
+      gap: 0;
       padding-top: calc(var(--gutter) + env(safe-area-inset-top));
+      font-size: var(--ui-size-small);
     }
     .logo {
-      top: 19dvh;
+      top: 20dvh;
       left: 50%;
       transform: translate(-50%, -50%);
     }
     .logo :global(svg) {
-      width: 76vw !important;
+      width: 72vw !important;
+    }
+    .home {
+      --play-size: 60px;
+      --row-size: 36px;
     }
     .roster {
       width: 100vw;
-      top: 34dvh;
-      bottom: auto;
+      top: 33dvh;
+      bottom: 0;
       transform: none;
       height: auto;
     }
-    .menu-item.opponents {
-      display: block;
-      font-family: var(--font-display);
-      font-weight: 800;
-      font-stretch: var(--display-stretch);
-      font-size: 26px;
-      letter-spacing: 0.01em;
-      text-transform: uppercase;
-      padding-top: 6px;
-    }
     ul {
-      display: none;
-    }
-    .roster-open ul {
-      display: block;
-      max-height: 52dvh;
-      margin: 0;
-      padding: 1vh 0 14vh;
-    }
-    .mobile-menu {
-      display: flex;
-      flex-direction: column;
-      position: absolute;
-      left: 0;
-      bottom: calc(5dvh + env(safe-area-inset-bottom));
-    }
-    .roster-open .mobile-menu {
-      display: none;
+      margin-top: 2.5dvh;
+      padding: 1dvh 0 calc(10dvh + env(safe-area-inset-bottom));
+      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 5%, #000 78%, transparent 100%);
+      mask-image: linear-gradient(to bottom, transparent 0, #000 5%, #000 78%, transparent 100%);
     }
     .year {
       font-size: 11px;
