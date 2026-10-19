@@ -16,6 +16,11 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same branch replaces a run still in progress (tags and pull requests too).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   NODE_VERSION: '22'
 

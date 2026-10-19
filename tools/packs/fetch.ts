@@ -1,7 +1,7 @@
 /**
  * Make sure models/packs holds exactly the packs models/manifest.json pins: each file's size and
  * SHA-256 is checked, and a missing or wrong one is downloaded from the manifest's remote sources
- * (the website, then the repository at tag models-v<version>). The packs are committed, so in a
+ * (the website, then the repository at the commit that added them). The packs are committed, so in a
  * full checkout this only verifies them; the GitHub Pages build and the CI test and installer jobs
  * run it so all of them ship exactly the pinned packs. `pnpm models:all` rebuilds packs from the
  * pinned upstream weights instead.

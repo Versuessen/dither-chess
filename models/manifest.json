@@ -2,7 +2,7 @@
   "format": 1,
   "sources": [
     "https://versuessen.github.io/dither-chess/models/packs/",
-    "https://raw.githubusercontent.com/Versuessen/dither-chess/models-v1.0.0/models/packs/",
+    "https://raw.githubusercontent.com/Versuessen/dither-chess/12487ac3341fa1124787f861928498cb60690898/models/packs/",
     "models/packs/"
   ],
   "packs": [

@@ -99,11 +99,13 @@ against `models/manifest.json`), runs the type check, the unit tests and `test:p
 very files it is about to publish, then deploys them. In the repository settings, Pages' source
 must be **GitHub Actions**. The site serves the packs itself, because the isolated page cannot rely
 on cross-origin downloads; the desktop app downloads them from the site too, or from the repository
-at the tag `models-v<version>`.
+at the commit that added them.
 
 New model packs: build them (`pnpm models:all` with `GITHUB_REPOSITORY=<owner>/<repository>` set,
-so the manifest lists the right download addresses), commit `models/packs` and
-`models/manifest.json`, and push the tag `models-v<version>` on that commit.
+so the manifest lists the website), commit `models/packs` and `models/manifest.json`, then add
+`https://raw.githubusercontent.com/<owner>/<repository>/<that commit>/models/packs/` to the
+manifest's sources, so installed desktop apps can still download them after newer packs replace
+them on `main`.
 
 ### Models
 
