@@ -33,12 +33,11 @@
     {/each}
   </nav>
 
-  <main class="panel" class:wide aria-labelledby="screen-title">
-    <header class="head">
-      <h1 id="screen-title">{title}</h1>
-      <a class="close" data-sound="back" href={href({ name: 'home' })}>Close</a>
+  <main class="panel window" class:wide aria-labelledby="screen-title">
+    <header class="titlebar">
+      <h1 id="screen-title" class="title">{title}</h1>
+      <span class="end"><a class="close" data-sound="back" href={href({ name: 'home' })}>Close</a></span>
     </header>
-    <hr />
     <div class="body">
       {@render children()}
     </div>
@@ -84,31 +83,19 @@
     background: var(--panel);
     color: var(--panel-ink);
     border-radius: var(--radius);
-    padding: 22px 26px 28px;
+    padding: 0 26px 28px;
   }
   .panel.wide {
     width: min(1180px, calc(100vw - 2 * var(--gutter)));
   }
-  .head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    color: var(--panel-muted);
-    font-size: var(--ui-size-small);
+  .panel > .titlebar {
+    margin: 0 -26px 24px;
+    border-radius: var(--radius) var(--radius) 0 0;
   }
   h1 {
     margin: 0;
     font: inherit;
     letter-spacing: inherit;
-  }
-  .close:hover {
-    color: var(--panel-ink);
-  }
-  hr {
-    border: 0;
-    border-top: var(--hairline) solid var(--panel-muted);
-    margin: 16px 0 22px;
-    opacity: 0.6;
   }
   @media (max-width: 760px) {
     .top-right {

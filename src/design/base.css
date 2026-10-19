@@ -122,3 +122,83 @@ a {
   transition-duration: 0.001ms !important;
   transition-delay: 0ms !important;
 }
+
+/*
+ * Window chrome for the panels, after the reference video's editor windows: an inverted title
+ * bar with a checkbox square, L-shaped corner brackets just outside the frame, and boxed
+ * counters. Panels opt in with .window (brackets) and a .titlebar header.
+ */
+.window {
+  position: relative;
+}
+.window::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+  pointer-events: none;
+  --bc: var(--over-dither);
+  background:
+    linear-gradient(var(--bc) 0 0) left top / 16px 2px,
+    linear-gradient(var(--bc) 0 0) left top / 2px 16px,
+    linear-gradient(var(--bc) 0 0) right top / 16px 2px,
+    linear-gradient(var(--bc) 0 0) right top / 2px 16px,
+    linear-gradient(var(--bc) 0 0) left bottom / 16px 2px,
+    linear-gradient(var(--bc) 0 0) left bottom / 2px 16px,
+    linear-gradient(var(--bc) 0 0) right bottom / 16px 2px,
+    linear-gradient(var(--bc) 0 0) right bottom / 2px 16px;
+  background-repeat: no-repeat;
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 7px 10px 7px 12px;
+  background: var(--panel-ink);
+  color: var(--panel);
+  font-size: var(--ui-size-small);
+  border-radius: var(--radius);
+}
+.titlebar .title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.titlebar .title::before {
+  content: '';
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid currentColor;
+}
+.titlebar .end {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  flex: none;
+}
+.titlebar a,
+.titlebar button {
+  color: inherit;
+}
+.titlebar a:hover,
+.titlebar button:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+
+/* A boxed number, like the video's frame counters. */
+.counter {
+  display: inline-block;
+  padding: 1px 7px;
+  background: var(--panel);
+  color: var(--panel-ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}

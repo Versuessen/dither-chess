@@ -335,12 +335,14 @@
     <span>{formatTimeControl(setup.timeControl)}</span>
   </div>
 
-  <main class="panel" aria-label="Game">
-    <header class="head">
-      <span>Game · {persona?.name ?? ''}</span>
-      <button class="close" data-sound="back" onclick={leave}>{controller?.outcome ? 'Close' : 'Leave'}</button>
+  <main class="panel window" aria-label="Game">
+    <header class="titlebar">
+      <span class="title">Game · {persona?.name ?? ''}</span>
+      <span class="end">
+        <span class="counter" title="Move" aria-hidden="true">{String(Math.floor((controller?.moves.length ?? 0) / 2) + 1).padStart(3, '0')}</span>
+        <button class="close" data-sound="back" onclick={leave}>{controller?.outcome ? 'Close' : 'Leave'}</button>
+      </span>
     </header>
-    <hr />
 
     {#if failure}
       <div class="failure">
@@ -540,22 +542,11 @@
     background: var(--panel);
     color: var(--panel-ink);
     border-radius: var(--radius);
-    padding: 18px 22px 22px;
+    padding: 0 22px 22px;
   }
-  .head {
-    display: flex;
-    justify-content: space-between;
-    color: var(--panel-muted);
-    font-size: var(--ui-size-small);
-  }
-  .close:hover {
-    color: var(--panel-ink);
-  }
-  hr {
-    border: 0;
-    border-top: var(--hairline) solid var(--panel-muted);
-    opacity: 0.6;
-    margin: 14px 0 18px;
+  .panel > .titlebar {
+    margin: 0 -22px 18px;
+    border-radius: var(--radius) var(--radius) 0 0;
   }
   .layout {
     /* The side column is exactly as tall as the board; the move list takes up the slack. */

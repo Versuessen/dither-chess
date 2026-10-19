@@ -146,7 +146,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="scrim" transition:fade={{ duration: 160 * motion }} onclick={close} onkeydown={() => {}}></div>
 <div
-  class="panel"
+  class="panel window"
   bind:this={panel}
   role="dialog"
   aria-modal="true"
@@ -155,11 +155,14 @@
   onkeydown={onKeydown}
   transition:scale={{ start: 0.965, duration: 200 * motion, easing: cubicOut, opacity: 0 }}
 >
-  <header class="head">
-    <span>Bot profile</span>
-    <button class="close" data-sound="back" onclick={close}>Close</button>
+  <header class="titlebar">
+    <span class="title">{custom ? 'Custom game' : 'Bot profile'}</span>
+    <span class="end">
+      <span class="counter" aria-hidden="true">{String(level).padStart(4, '0')}</span>
+      <button class="close" data-sound="back" onclick={close}>Close</button>
+    </span>
   </header>
-  <hr />
+  <div class="body">
   <div class="top">
     <div class="facts">
       <h2 id="bot-name" class="name">{persona.name}</h2>
@@ -255,6 +258,7 @@
     </div>
   </div>
 </div>
+</div>
 
 <style>
   .scrim {
@@ -271,24 +275,23 @@
     translate: -50% -50%;
     width: min(920px, calc(100vw - 2 * var(--gutter)));
     max-height: calc(100dvh - 2 * var(--gutter));
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
     background: var(--panel);
     color: var(--panel-ink);
     border-radius: var(--radius);
-    padding: 22px 26px 26px;
     outline: none;
   }
-  .head {
-    display: flex;
-    justify-content: space-between;
-    color: var(--panel-muted);
-    font-size: var(--ui-size-small);
+  .titlebar {
+    flex: none;
+    margin: 0;
+    border-radius: var(--radius) var(--radius) 0 0;
   }
-  .close {
-    color: var(--panel-muted);
-  }
-  .close:hover {
-    color: var(--panel-ink);
+  /* The content scrolls inside the frame, so the corner brackets stay outside it. */
+  .body {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 22px 26px 26px;
   }
   hr {
     border: 0;
