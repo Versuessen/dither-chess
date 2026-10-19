@@ -50,8 +50,10 @@ uniform float uReveal;        // 0..1 lines grow in (preloader)
 uniform float uBlack;         // 0..1 fade to grain-on-black (preloader)
 uniform float uCalm;          // 0..1 game-screen calm
 
-uniform float uScreenA;       // screen of the incoming subject: 0 lines, 1 dots, 2 mosaic, 3 dotted lines
-uniform float uScreenB;       // screen of the outgoing subject
+// Compiled per variant (fragmentSource): SCREEN_A / SCREEN_B are the screens of the incoming and
+// outgoing subjects (0 lines, 1 dots, 2 mosaic, 3 dotted lines); DISSOLVE, LIVE and MORPH switch
+// on the code for a running dissolve, the live 3D piece and the promotion morph. Constant screens
+// let the compiler drop the unused patterns, which software renderers cannot do for uniforms.
 uniform vec3 uAccent;         // opponent's accent for the light ink
 uniform float uAccentAmt;     // 0..1
 
@@ -106,15 +108,23 @@ float morphTone(vec2 uv) {
 
 // Tone of plane A (which 0) or B at a screen uv, after the tone curve and calm.
 float toneOf(int which, vec2 uv) {
-  float t = which == 0 ? sceneTone(uSubjA, uFitA, uv) : sceneTone(uSubjB, uFitB, uv);
-  if (which == 0 && uLiveMix > 0.001) {
+  // if/else, not ?:, so only one plane is sampled (some compilers evaluate both sides of ?:).
+  float t;
+  if (which == 0) t = sceneTone(uSubjA, uFitA, uv);
+  else t = sceneTone(uSubjB, uFitB, uv);
+#if LIVE
+  if (which == 0) {
     vec2 lu = uv * uLiveFit.xy + uLiveFit.zw;
     float inBox = step(0.0, lu.x) * step(lu.x, 1.0) * step(0.0, lu.y) * step(lu.y, 1.0);
     vec2 l = texture(uLive, vec2(lu.x, 1.0 - lu.y)).rg * inBox;
     float bg = texture(uSubjA, uv * uFitA.xy + uFitA.zw + uBgOffset).b;
     t = mix(t, mix(bg, l.x, l.y), uLiveMix);
   }
-  if (uMorphMix > 0.001) t = mix(t, morphTone(uv), uMorphMix);
+#endif
+
+#if MORPH
+  t = mix(t, morphTone(uv), uMorphMix);
+#endif
   // Tone curve: let deep shadows go fully to the shadow ink and highlights fill the cell.
   t = pow(clamp((t - 0.07) / 0.86, 0.0, 1.0), 1.12);
   // Calm: compress the tone range so the image recedes behind the board.
@@ -196,10 +206,12 @@ void main() {
   // ---- coverage of both planes -----------------------------------------------------------
   // Uniform branch: the outgoing image costs nothing at rest.
   float tA, wA, dA, tB, wB, dB;
-  float covA = cover(uScreenA, 0, fc, ripple, g1, grainAmt, revealLine, tA, wA, dA);
+  float covA = cover(float(SCREEN_A), 0, fc, ripple, g1, grainAmt, revealLine, tA, wA, dA);
   float covB = covA;
   tB = tA; wB = wA; dB = dA;
-  if (uDissolve < 1.0) covB = cover(uScreenB, 1, fc, ripple, g1, grainAmt, revealLine, tB, wB, dB);
+#if DISSOLVE
+  covB = cover(float(SCREEN_B), 1, fc, ripple, g1, grainAmt, revealLine, tB, wB, dB);
+#endif
 
   // ---- segment-wise threshold dissolve ------------------------------------------------------
   float segLen = uPeriod * (6.0 + 10.0 * hash(vec2(line, 91.0)));
@@ -231,3 +243,27 @@ void main() {
   outColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }
 `;
+
+/** Which parts of the fragment shader a frame needs. */
+export interface FragmentVariant {
+  screenA: number;
+  /** null when no dissolve is running. */
+  screenB: number | null;
+  live: boolean;
+  morph: boolean;
+}
+
+export function variantKey(v: FragmentVariant): string {
+  return `${v.screenA}${v.screenB ?? '-'}${v.live ? 'L' : ''}${v.morph ? 'M' : ''}`;
+}
+
+export function fragmentSource(v: FragmentVariant): string {
+  const defines = [
+    `#define SCREEN_A ${v.screenA}`,
+    `#define SCREEN_B ${v.screenB ?? v.screenA}`,
+    `#define DISSOLVE ${v.screenB === null ? 0 : 1}`,
+    `#define LIVE ${v.live ? 1 : 0}`,
+    `#define MORPH ${v.morph ? 1 : 0}`
+  ].join('\n');
+  return FRAGMENT.replace('#version 300 es\n', `#version 300 es\n${defines}\n`);
+}

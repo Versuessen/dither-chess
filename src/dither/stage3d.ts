@@ -118,7 +118,7 @@ interface GpuMesh {
 }
 
 /** Texture size: the piece's square viewport, in pixels. */
-const SIZE = 640;
+const SIZE = 512;
 
 export class Stage3D {
   private program: WebGLProgram;

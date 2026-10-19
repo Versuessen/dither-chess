@@ -3,7 +3,7 @@
  * reads its inks from the theme tokens. With reduced motion it renders one static frame
  * per state change: no parallax, no drift, frozen wave, instant swaps.
  */
-import { FRAGMENT, VERTEX } from './shaders';
+import { VERTEX, fragmentSource, variantKey, type FragmentVariant } from './shaders';
 import { KnightDrift, approach, coverFit, shouldRender, type Size } from './motion';
 import { toVec3 } from '../design/contrast';
 import { Stage3D } from './stage3d';
@@ -101,8 +101,6 @@ type UniformName =
   | 'uReveal'
   | 'uBlack'
   | 'uCalm'
-  | 'uScreenA'
-  | 'uScreenB'
   | 'uAccent'
   | 'uAccentAmt'
   | 'uLive'
@@ -135,6 +133,7 @@ export class DitherRenderer {
   private gl: WebGL2RenderingContext;
   private program: WebGLProgram | null = null;
   private uniforms = new Map<UniformName, WebGLUniformLocation | null>();
+  private programs = new Map<string, { program: WebGLProgram; uniforms: Map<UniformName, WebGLUniformLocation | null> }>();
   private textures = new Map<string, Tex>();
   private loading = new Map<string, Promise<Tex>>();
   private morph: Tex | null = null;
@@ -152,6 +151,7 @@ export class DitherRenderer {
   private vao: WebGLVertexArrayObject | null = null;
   private currentId: string | null = null;
   private liveMix = 0;
+  private liveAllowed = false;
   private dissolveStart = -Infinity;
 
   private mode: DitherMode = 'black';
@@ -268,6 +268,12 @@ export class DitherRenderer {
     if (!this.reducedMotion) this.invalidate();
   }
 
+  /** Whether the live 3D piece may show (the home screen only: elsewhere it would be hidden behind a panel). */
+  setLive3D(on: boolean): void {
+    this.liveAllowed = on;
+    this.invalidate();
+  }
+
   /** Scroll progress of the roster in [0, 1]. */
   setScroll(p: number): void {
     this.scroll = p;
@@ -329,32 +335,16 @@ export class DitherRenderer {
     if (this.morph) gl.deleteTexture(this.morph.tex);
     if (this.blank) gl.deleteTexture(this.blank.tex);
     this.stage?.dispose();
-    if (this.program) gl.deleteProgram(this.program);
+    for (const e of this.programs.values()) gl.deleteProgram(e.program);
   }
 
   // ------------------------------------------------------------------ internals
 
   private init(): void {
     const gl = this.gl;
-    const compile = (type: number, src: string) => {
-      const s = gl.createShader(type)!;
-      gl.shaderSource(s, src);
-      gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS) && !gl.isContextLost()) {
-        throw new Error(`shader: ${gl.getShaderInfoLog(s)}`);
-      }
-      return s;
-    };
-    const p = gl.createProgram()!;
-    gl.attachShader(p, compile(gl.VERTEX_SHADER, VERTEX));
-    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, FRAGMENT));
-    gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS) && !gl.isContextLost()) {
-      throw new Error(`program: ${gl.getProgramInfoLog(p)}`);
-    }
-    this.program = p;
-    gl.useProgram(p);
-    this.uniforms.clear();
+    this.programs.clear();
+    this.program = null;
+    this.use({ screenA: 0, screenB: null, live: false, morph: false });
     this.vao = gl.createVertexArray();
     gl.bindVertexArray(this.vao);
     // The live 3D piece is an extra: without it the still images are shown.
@@ -366,6 +356,42 @@ export class DitherRenderer {
     }
     this.blank = this.makeTexture(new Uint8Array([0, 0, 0]), { width: 1, height: 1 }, [0.5, 0.5]);
     void this.loadMorph();
+  }
+
+  /** Compile (once) and bind the fragment shader variant a frame needs. */
+  private use(v: FragmentVariant): void {
+    const gl = this.gl;
+    const key = variantKey(v);
+    let entry = this.programs.get(key);
+    if (!entry) {
+      const compile = (type: number, src: string) => {
+        const s = gl.createShader(type)!;
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS) && !gl.isContextLost()) {
+          throw new Error(`shader: ${gl.getShaderInfoLog(s)}`);
+        }
+        return s;
+      };
+      const p = gl.createProgram()!;
+      const vs = compile(gl.VERTEX_SHADER, VERTEX);
+      const fs = compile(gl.FRAGMENT_SHADER, fragmentSource(v));
+      gl.attachShader(p, vs);
+      gl.attachShader(p, fs);
+      gl.linkProgram(p);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS) && !gl.isContextLost()) {
+        throw new Error(`program: ${gl.getProgramInfoLog(p)}`);
+      }
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      entry = { program: p, uniforms: new Map() };
+      this.programs.set(key, entry);
+    }
+    if (this.program !== entry.program) {
+      this.program = entry.program;
+      this.uniforms = entry.uniforms;
+      gl.useProgram(entry.program);
+    }
   }
 
   private u(name: UniformName): WebGLUniformLocation | null {
@@ -512,7 +538,7 @@ export class DitherRenderer {
 
   /** The home screen shows the hovered opponent's piece as a live 3D model. */
   private liveWanted(): boolean {
-    return !!this.stage && this.mode === 'live' && !this.reducedMotion && !!this.currentId && this.currentId in SCENE_PIECE;
+    return !!this.stage && this.liveAllowed && this.mode === 'live' && !this.reducedMotion && !!this.currentId && this.currentId in SCENE_PIECE;
   }
 
   /** The piece's square on screen: right of centre on wide screens, upper middle on tall ones. */
@@ -554,6 +580,13 @@ export class DitherRenderer {
     const fitB = coverFit(prev.size, view, prev.focal);
     const dissolve = Math.min(1, Math.max(0, (now - this.dissolveStart) / DISSOLVE_MS));
     if (dissolve < 1) this.dirty = true;
+    const livePiece = this.stage && this.liveMix > 0.001 && this.currentId ? SCENE_PIECE[this.currentId] : undefined;
+    this.use({
+      screenA: this.screenA,
+      screenB: dissolve < 1 ? this.screenB : null,
+      live: !!livePiece,
+      morph: !!this.morph && this.morphMix > 0.001
+    });
 
     const still = this.reducedMotion || this.opts.still === true;
     const t = (now - this.startTime) / 1000;
@@ -611,13 +644,11 @@ export class DitherRenderer {
     gl.uniform1f(this.u('uReveal'), this.modeValues.reveal);
     gl.uniform1f(this.u('uBlack'), this.modeValues.black);
     gl.uniform1f(this.u('uCalm'), this.modeValues.calm);
-    gl.uniform1f(this.u('uScreenA'), this.screenA);
-    gl.uniform1f(this.u('uScreenB'), this.screenB);
     gl.uniform3f(this.u('uAccent'), ...this.accentNow);
     gl.uniform1f(this.u('uAccentAmt'), this.accentAmt);
 
     // The live piece: it floats, twists slowly, and tilts towards the pointer.
-    const live = this.stage && this.liveMix > 0.001 && this.currentId ? SCENE_PIECE[this.currentId] : undefined;
+    const live = livePiece;
     if (live && this.stage && this.program) {
       this.stage.render(
         live,

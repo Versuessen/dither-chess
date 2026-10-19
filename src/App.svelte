@@ -4,12 +4,14 @@
   import Preloader from './screens/Preloader.svelte';
   import Home from './screens/Home.svelte';
   import BotProfile from './screens/BotProfile.svelte';
-  import Settings from './screens/Settings.svelte';
-  import Models from './screens/Models.svelte';
-  import Rating from './screens/Rating.svelte';
-  import History from './screens/History.svelte';
-  import Analysis from './screens/Analysis.svelte';
-  import Game from './screens/Game.svelte';
+  // Screens other than the roster load when they are first opened, so the first screen starts
+  // with less JavaScript (DECISIONS.md, performance budgets); the service worker caches them all.
+  const loadSettings = () => import('./screens/Settings.svelte');
+  const loadModels = () => import('./screens/Models.svelte');
+  const loadRating = () => import('./screens/Rating.svelte');
+  const loadHistory = () => import('./screens/History.svelte');
+  const loadAnalysis = () => import('./screens/Analysis.svelte');
+  const loadGame = () => import('./screens/Game.svelte');
   import { createOpponent } from './inference/opponents';
   import { notifyFinished } from './game/finalize';
   import { storage } from './storage';
@@ -37,6 +39,10 @@
   $effect(() => {
     if (booting) return;
     ui.mode = route.name === 'game' ? 'calm' : 'live';
+  });
+
+  $effect(() => {
+    ui.home = !booting && (route.name === 'home' || route.name === 'bot');
   });
 
   $effect(() => {
@@ -99,20 +105,24 @@
     <Home covered={route.name === 'bot'} />
   </div>
 {:else if route.name === 'settings' && boot.dataReady}
-  <div class="screen" class:booting><Settings /></div>
+  {#await loadSettings() then { default: Settings }}<div class="screen" class:booting><Settings /></div>{/await}
 {:else if route.name === 'models' && boot.dataReady}
-  <div class="screen" class:booting><Models /></div>
+  {#await loadModels() then { default: Models }}<div class="screen" class:booting><Models /></div>{/await}
 {:else if route.name === 'rating' && boot.dataReady}
-  <div class="screen" class:booting><Rating /></div>
+  {#await loadRating() then { default: Rating }}<div class="screen" class:booting><Rating /></div>{/await}
 {:else if route.name === 'history' && boot.dataReady}
-  <div class="screen" class:booting><History /></div>
+  {#await loadHistory() then { default: History }}<div class="screen" class:booting><History /></div>{/await}
 {:else if route.name === 'analysis' && boot.dataReady}
   {#key route.game}
-    <div class="screen" class:booting><Analysis gameId={route.game} /></div>
+    {#await loadAnalysis() then { default: Analysis }}
+      <div class="screen" class:booting><Analysis gameId={route.game} /></div>
+    {/await}
   {/key}
 {:else if route.name === 'game' && session.pending && !booting}
   {#key session.gameNo}
-    <Game setup={session.pending} {createOpponent} storage={storage()} onfinished={notifyFinished} />
+    {#await loadGame() then { default: Game }}
+      <Game setup={session.pending!} {createOpponent} storage={storage()} onfinished={notifyFinished} />
+    {/await}
   {/key}
 {/if}
 
