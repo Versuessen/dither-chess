@@ -82,6 +82,7 @@ pnpm test:e2e       # Playwright on the production build: a full rated game per 
                     # WCAG 2.1 AA (axe) and keyboard play, performance budgets, themes, reduced motion
 pnpm test:static    # the website build on a plain static host: sub-path, no COOP/COEP (service-worker
                     # isolation), models installing by themselves, source archive, offline
+DITHER_STATIC_URL=https://dither-chess.vercel.app pnpm test:static   # the same test on the live website
 ```
 
 The model-parity tests run the exported ONNX models through onnxruntime-web when they are present in
@@ -108,8 +109,9 @@ configuration, so the Vercel project needs no settings beyond importing the repo
   private.
 
 Every push to `main` deploys to production; other branches and pull requests get preview
-deployments. Set up once: on vercel.com, **Add New → Project**, import this repository, keep the
-project name `dither-chess` (it becomes `dither-chess.vercel.app`), and deploy.
+deployments. The Vercel project is `dither-chess` in the team `dither-chess`. To set it up again
+elsewhere: on vercel.com, **Add New → Project**, import this repository and deploy; the project
+name becomes the address (`<name>.vercel.app`).
 
 New model packs: build them (`pnpm models:all` with `DITHER_SITE_URL=https://dither-chess.vercel.app`,
 so the manifest lists the website as their download address), then commit `models/packs` and

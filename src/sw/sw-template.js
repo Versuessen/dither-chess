@@ -62,7 +62,10 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(req, { ignoreSearch: false }).then(async (cached) => {
+    // ignoreVary: precached files are the same for every request, but a host may still mark them
+    // `Vary: Origin` (vite preview does), and module imports carry an Origin header the precache
+    // requests did not, so honouring Vary would miss the cache exactly when offline.
+    caches.match(req, { ignoreSearch: false, ignoreVary: true }).then(async (cached) => {
       if (cached) return isolate(cached);
       try {
         return isolate(await fetch(req));
