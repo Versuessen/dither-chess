@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { fade, scale } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import type { Persona } from '../bots/personas';
+  import { CUSTOM, type Persona } from '../bots/personas';
   import { ui } from '../app/ui.svelte';
   import { router } from '../app/router.svelte';
   import { session } from '../app/session.svelte';
@@ -25,6 +25,8 @@
   let colour = $state<ColourChoice>(prefs.colour);
   let timeControl = $state<TimeControl>(prefs.timeControl);
   let rated = $state(prefs.rated);
+  // The panel is keyed by persona (App.svelte), so the persona never changes while it is open.
+  const custom = untrack(() => persona.id) === CUSTOM.id;
   let level = $state(0);
   let panel: HTMLElement;
   let opener: HTMLElement | null = null;
@@ -56,7 +58,7 @@
     }
   });
   $effect.pre(() => {
-    const snapped = nearestLevel(covered, level || persona.level);
+    const snapped = nearestLevel(covered, level || (custom ? (prefs.customLevel ?? persona.level) : persona.level));
     if (snapped !== null && snapped !== level) level = snapped;
   });
 
@@ -64,7 +66,9 @@
     const list = [...covered].sort((a, b) => a - b);
     const i = list.indexOf(level);
     const next = list[i + dir];
-    if (next !== undefined) level = next;
+    if (next === undefined) return;
+    level = next;
+    if (custom) remember();
   }
 
   function close() {
@@ -83,7 +87,7 @@
   }
 
   function remember() {
-    savePrefs({ family, colour, timeControl, rated });
+    savePrefs({ family, colour, timeControl, rated, ...(custom ? { customLevel: level } : prefs.customLevel ? { customLevel: prefs.customLevel } : {}) });
   }
 
   function focusables(): HTMLElement[] {

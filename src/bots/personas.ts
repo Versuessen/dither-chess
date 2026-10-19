@@ -117,6 +117,18 @@ export const PERSONAS: readonly Persona[] = [
 
 export const HOME_SUBJECT = 'hero';
 
+/**
+ * The Play button's opponent: no character, any model at any rating it covers. Its level is the
+ * one last chosen for it (SetupPrefs.customLevel).
+ */
+export const CUSTOM: Persona = {
+  id: 'custom',
+  level: 1200,
+  name: 'Custom',
+  subject: HOME_SUBJECT,
+  bio: 'Any model at any rating it covers: pick the model, set the strength with the rating control, then the colour and the clock.'
+};
+
 export function personaById(id: string): Persona | undefined {
-  return PERSONAS.find((p) => p.id === id);
+  return id === CUSTOM.id ? CUSTOM : PERSONAS.find((p) => p.id === id);
 }

@@ -20,6 +20,8 @@ export interface SetupPrefs {
   colour: ColourChoice;
   timeControl: TimeControl;
   rated: boolean;
+  /** Rating last chosen for the custom opponent (the Play button), if any. */
+  customLevel?: number;
 }
 
 const KEY = 'dither.setup';
@@ -44,7 +46,8 @@ export function loadPrefs(storage: Storage | undefined = globalThis.localStorage
         v.timeControl && Number.isFinite(v.timeControl.base) && Number.isFinite(v.timeControl.increment)
           ? { base: v.timeControl.base, increment: v.timeControl.increment }
           : DEFAULT_PREFS.timeControl,
-      rated: typeof v.rated === 'boolean' ? v.rated : DEFAULT_PREFS.rated
+      rated: typeof v.rated === 'boolean' ? v.rated : DEFAULT_PREFS.rated,
+      ...(Number.isFinite(v.customLevel) ? { customLevel: v.customLevel } : {})
     };
   } catch {
     return DEFAULT_PREFS;

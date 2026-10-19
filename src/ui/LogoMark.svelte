@@ -32,20 +32,27 @@
 
 <script lang="ts">
   interface Props {
-    /** CSS width; height follows the 5:2 aspect. */
+    /** CSS width; height follows the aspect. */
     width?: string;
     label?: string;
+    /**
+     * A small tag under the end of the wordmark (the home logo: "CHESS"), like the code labels of
+     * the reference video: a solid box with corner brackets, its letters cut out so the dither
+     * shows through, as the star and the wordmark cut each other.
+     */
+    tag?: string;
   }
-  let { width = 'min(52vw, 560px)', label = 'Dither' }: Props = $props();
+  let { width = 'min(52vw, 560px)', label = 'Dither', tag }: Props = $props();
+  const tagWidth = $derived(tag ? 24 + tag.length * 17.6 : 0);
   const uid = $props.id();
 </script>
 
 <svg
   class="logo"
   style:width
-  viewBox="-250 -125 500 250"
+  viewBox="-250 -125 500 {tag ? 225 : 250}"
   role="img"
-  aria-label={label}
+  aria-label={tag ? `${label} ${tag.toLowerCase()}` : label}
   xmlns="http://www.w3.org/2000/svg"
 >
   <defs>
@@ -57,9 +64,24 @@
       <rect x="-250" y="-125" width="500" height="250" fill="white" />
       <path d={STAR_PATH} fill="black" />
     </mask>
+    {#if tag}
+      <mask id="cut-tag-{uid}" maskUnits="userSpaceOnUse" x="-250" y="-125" width="500" height="250">
+        <rect x={230 - tagWidth} y="60" width={tagWidth} height="30" fill="white" />
+        <text class="tag" x={230 - tagWidth / 2} y="81" text-anchor="middle" fill="black">{tag}</text>
+      </mask>
+    {/if}
   </defs>
   <path d={STAR_PATH} fill="currentColor" mask="url(#cut-text-{uid})" />
   <text class="word" x="0" y="38" text-anchor="middle" fill="currentColor" mask="url(#cut-star-{uid})">DITHER</text>
+  {#if tag}
+    <rect x={230 - tagWidth} y="60" width={tagWidth} height="30" fill="currentColor" mask="url(#cut-tag-{uid})" />
+    <path
+      d="M{222 - tagWidth} 62 v-10 h10 M238 88 v10 h-10"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+    />
+  {/if}
 </svg>
 
 <style>
@@ -67,6 +89,11 @@
     display: block;
     height: auto;
     overflow: visible;
+  }
+  .tag {
+    font-family: var(--font-ui);
+    font-size: 17px;
+    letter-spacing: 0.18em;
   }
   .word {
     font-family: var(--font-display);

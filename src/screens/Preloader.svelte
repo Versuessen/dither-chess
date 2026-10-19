@@ -51,7 +51,7 @@
 
 <div class="pre" class:reveal={stage === 'reveal'} class:reduced={ui.reducedMotion} aria-busy={stage !== 'reveal'}>
   <div class="logo" class:shown={stage !== 'grain'}>
-    <LogoMark width="min(34vw, 500px)" label="Dither is loading" />
+    <LogoMark width="min(34vw, 500px)" label="Dither is loading" tag="CHESS" />
   </div>
   <div class="rail" class:gone={stage !== 'grain'}>
     <ScrollRail progress={ui.loading ?? 1} filling label="Loading models" />

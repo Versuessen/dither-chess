@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { PERSONAS, HOME_SUBJECT, type Persona } from '../bots/personas';
+  import { PERSONAS, HOME_SUBJECT, CUSTOM, type Persona } from '../bots/personas';
+  import { settings } from '../app/settings.svelte';
   import { ui } from '../app/ui.svelte';
   import { router, href } from '../app/router.svelte';
   import LogoMark from '../ui/LogoMark.svelte';
@@ -14,6 +15,16 @@
   let list: HTMLUListElement;
   let leaveTimer: ReturnType<typeof setTimeout> | undefined;
   let visible = $state(1);
+  /** Phones: the roster opens from the menu. */
+  let rosterOpen = $state(false);
+
+  function seek(f: number) {
+    list.scrollTop = f * (list.scrollHeight - list.clientHeight);
+  }
+
+  function toggleDev() {
+    void settings.update({ devMode: !settings.value.devMode });
+  }
 
   function show(p: Persona) {
     clearTimeout(leaveTimer);
@@ -55,21 +66,39 @@
   });
 </script>
 
-<div class="home" class:covered inert={covered}>
+<div class="home" class:covered class:roster-open={rosterOpen} inert={covered}>
   <header class="corner top-left">Human-like chess · offline</header>
   <div class="corner top-center wordmark" aria-hidden="true">DITHER</div>
   <nav class="corner top-right" aria-label="Main">
     <a href={href({ name: 'models' })}>Models</a>
     <a href={href({ name: 'rating' })}>Rating</a>
-    <span class="year">2026©</span>
+    <a href={href({ name: 'history' })}>History</a>
+    <a href={href({ name: 'settings' })}>Settings</a>
   </nav>
 
   <div class="logo">
-    <LogoMark width="min(34vw, 500px)" />
+    <LogoMark width="min(34vw, 500px)" tag="CHESS" />
   </div>
 
   <section class="roster" aria-label="Choose an opponent">
-    <ul bind:this={list} onscroll={onScroll} onpointerleave={leave}>
+    <!-- Outside the scrolling list: any model at any rating. -->
+    <button
+      class="row display play"
+      onpointerenter={() => show(CUSTOM)}
+      onpointerleave={leave}
+      onfocus={() => show(CUSTOM)}
+      onblur={leave}
+      onclick={() => open(CUSTOM)}
+      data-persona={CUSTOM.id}
+      data-sound="confirm"
+    >
+      <span class="level">Any</span>
+      <span class="name">Play</span>
+    </button>
+    <button class="menu-item opponents" aria-expanded={rosterOpen} aria-controls="roster-list" onclick={() => (rosterOpen = !rosterOpen)}>
+      {rosterOpen ? 'Hide opponents' : 'Opponents'}
+    </button>
+    <ul id="roster-list" bind:this={list} onscroll={onScroll} onpointerleave={leave}>
       {#each PERSONAS as p, i (p.id)}
         <li>
           <button
@@ -89,10 +118,24 @@
     </ul>
   </section>
 
-  <ScrollRail progress={ui.scroll} size={visible} />
+  <ScrollRail progress={ui.scroll} size={visible} controls="roster-list" label="Opponents" onseek={seek} />
 
-  <a class="corner bottom-left muted" href={href({ name: 'settings' })}>Settings</a>
-  <a class="corner bottom-right muted" href={href({ name: 'history' })}>History</a>
+  <nav class="mobile-menu" aria-label="Menu">
+    <a class="menu-item" href={href({ name: 'history' })}>History</a>
+    <a class="menu-item" href={href({ name: 'rating' })}>Rating</a>
+    <a class="menu-item" href={href({ name: 'models' })}>Models</a>
+    <a class="menu-item" href={href({ name: 'settings' })}>Settings</a>
+  </nav>
+
+  <!-- The copyright sign also switches the developer details (PGN text and diagnostics) on and off. -->
+  <button
+    class="corner bottom-left muted year"
+    aria-pressed={settings.value.devMode}
+    title={settings.value.devMode ? 'Developer details on' : '2026'}
+    onclick={toggleDev}
+  >
+    2026©{settings.value.devMode ? ' · dev' : ''}
+  </button>
 </div>
 
 <style>
@@ -138,16 +181,15 @@
     bottom: 0;
     left: 0;
   }
-  .bottom-right {
-    bottom: 0;
-    right: 0;
-  }
   .muted {
     color: var(--over-dither-muted);
     font-size: var(--ui-size-small);
   }
+  .year[aria-pressed='true'] {
+    color: var(--over-dither);
+  }
   .corner a:hover,
-  a.corner:hover {
+  button.corner:hover {
     text-decoration: underline;
     text-underline-offset: 0.3em;
   }
@@ -167,18 +209,28 @@
     top: 50%;
     transform: translateY(-50%);
     width: min(50vw, 780px);
-    height: min(72vh, 820px);
+    height: min(76vh, 860px);
+    display: flex;
+    flex-direction: column;
   }
+  .play {
+    flex: none;
+  }
+  .play .level {
+    text-transform: uppercase;
+  }
+  /* The list starts a little below the Play button and fades out well before the bottom. */
   ul {
+    flex: 1;
+    min-height: 0;
     list-style: none;
-    margin: 0;
-    padding: 12vh 0;
-    height: 100%;
+    margin: 1.2vh 0 0;
+    padding: 3vh 0 16vh;
     overflow-y: auto;
     scrollbar-width: none;
     overscroll-behavior: contain;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 62%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 62%, transparent 100%);
   }
   ul::-webkit-scrollbar {
     display: none;
@@ -219,35 +271,90 @@
     white-space: nowrap;
   }
 
+  .menu-item {
+    display: block;
+    min-height: 44px;
+    padding: 12px var(--gutter);
+    font-size: var(--ui-size);
+    letter-spacing: var(--ui-tracking);
+    text-align: left;
+    color: var(--over-dither);
+  }
+  /* Phone-only controls. */
+  .menu-item.opponents,
+  .mobile-menu {
+    display: none;
+  }
+
+  /* Phones and narrow windows: a main menu (Play, then the rest), the roster on demand. */
   @media (max-width: 760px) {
-    .top-left {
+    .top-left,
+    .top-right,
+    .top-center,
+    .play .level,
+    .home :global(.rail) {
       display: none;
+    }
+    .play {
+      font-size: 64px;
     }
     .top-center {
       left: var(--gutter);
       transform: none;
       padding-left: 0;
+      padding-top: calc(var(--gutter) + env(safe-area-inset-top));
     }
     .logo {
-      top: 15vh;
+      top: 19dvh;
       left: 50%;
       transform: translate(-50%, -50%);
     }
     .logo :global(svg) {
-      width: 62vw !important;
+      width: 76vw !important;
     }
     .roster {
       width: 100vw;
-      top: auto;
-      bottom: 6vh;
+      top: 34dvh;
+      bottom: auto;
       transform: none;
-      height: 64vh;
+      height: auto;
     }
-    .top-right {
-      gap: 1.2em;
+    .menu-item.opponents {
+      display: block;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-stretch: var(--display-stretch);
+      font-size: 26px;
+      letter-spacing: 0.01em;
+      text-transform: uppercase;
+      padding-top: 6px;
+    }
+    ul {
+      display: none;
+    }
+    .roster-open ul {
+      display: block;
+      max-height: 52dvh;
+      margin: 0;
+      padding: 1vh 0 14vh;
+    }
+    .mobile-menu {
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      left: 0;
+      bottom: calc(5dvh + env(safe-area-inset-bottom));
+    }
+    .roster-open .mobile-menu {
+      display: none;
     }
     .year {
-      display: none;
+      font-size: 11px;
+      padding-bottom: calc(var(--gutter) + env(safe-area-inset-bottom));
+    }
+    .bottom-left.year {
+      left: auto;
+      right: 0;
     }
   }
 </style>
