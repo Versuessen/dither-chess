@@ -1,0 +1,42 @@
+[
+  {
+    "model": "fastelo",
+    "positions": 2016,
+    "top1_agreement": 1.0,
+    "max_abs_logit_diff": 2.0503997802734375e-05,
+    "max_abs_legal_logit_diff": 1.5735626220703125e-05,
+    "max_abs_value_diff": 4.5299530029296875e-06,
+    "seconds": 288.1,
+    "pass": true
+  },
+  {
+    "model": "maia3-5m",
+    "positions": 2016,
+    "top1_agreement": 1.0,
+    "max_abs_logit_diff": 2.193450927734375e-05,
+    "max_abs_legal_logit_diff": 1.33514404296875e-05,
+    "max_abs_value_diff": 2.86102294921875e-06,
+    "seconds": 137.0,
+    "pass": true
+  },
+  {
+    "model": "maia3-23m",
+    "positions": 2016,
+    "top1_agreement": 1.0,
+    "max_abs_logit_diff": 2.6702880859375e-05,
+    "max_abs_legal_logit_diff": 2.288818359375e-05,
+    "max_abs_value_diff": 2.86102294921875e-06,
+    "seconds": 296.2,
+    "pass": true
+  },
+  {
+    "model": "maia2-rapid",
+    "positions": 2016,
+    "top1_agreement": 1.0,
+    "max_abs_logit_diff": 0.0,
+    "max_abs_legal_logit_diff": 0.0,
+    "max_abs_value_diff": 0.0,
+    "seconds": 76.5,
+    "pass": true
+  }
+]

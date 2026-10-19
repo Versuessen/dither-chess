@@ -1,0 +1,16 @@
+/* The 1-bit dithered piece set (tools/art/pieces1bit.ts). */
+.pieces-dither piece {
+  image-rendering: pixelated;
+}
+.cg-wrap.pieces-dither piece.pawn.white { background-image: url('/pieces/dither/wP.svg'); }
+.cg-wrap.pieces-dither piece.knight.white { background-image: url('/pieces/dither/wN.svg'); }
+.cg-wrap.pieces-dither piece.bishop.white { background-image: url('/pieces/dither/wB.svg'); }
+.cg-wrap.pieces-dither piece.rook.white { background-image: url('/pieces/dither/wR.svg'); }
+.cg-wrap.pieces-dither piece.queen.white { background-image: url('/pieces/dither/wQ.svg'); }
+.cg-wrap.pieces-dither piece.king.white { background-image: url('/pieces/dither/wK.svg'); }
+.cg-wrap.pieces-dither piece.pawn.black { background-image: url('/pieces/dither/bP.svg'); }
+.cg-wrap.pieces-dither piece.knight.black { background-image: url('/pieces/dither/bN.svg'); }
+.cg-wrap.pieces-dither piece.bishop.black { background-image: url('/pieces/dither/bB.svg'); }
+.cg-wrap.pieces-dither piece.rook.black { background-image: url('/pieces/dither/bR.svg'); }
+.cg-wrap.pieces-dither piece.queen.black { background-image: url('/pieces/dither/bQ.svg'); }
+.cg-wrap.pieces-dither piece.king.black { background-image: url('/pieces/dither/bK.svg'); }

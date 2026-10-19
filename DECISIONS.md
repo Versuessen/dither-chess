@@ -17,7 +17,7 @@ brief could not be followed literally; the closest faithful option is described 
 
 ## Environment
 
-- The build workspace cannot reach huggingface.co, database.lichess.org or Playwright's browser CDN (GitHub, npm, PyPI and Ubuntu apt work). Model conversion, parity and calibration tools are written to run in CI or on a developer machine; their results are committed when they have run.
+- During Phase 1 the build workspace could not reach huggingface.co or database.lichess.org; from Phase 2 on it can, so model conversion, parity and calibration ran here and their reports are committed. Playwright's browser CDN stays unreachable.
 - The attached reference screenshots did not arrive; the design follows the written description of hyper-dreams.com.
 - End-to-end tests run locally on Chromium 153 from the `@sparticuz/chromium` npm package (set `DITHER_CHROMIUM`); CI uses `playwright install chromium`.
 
@@ -63,3 +63,69 @@ brief could not be followed literally; the closest faithful option is described 
 
 ### Preloader
 - Black with live grain while the bar fills (fonts, first image; later the inference worker), then the logo alone, then the lines grow in. With everything cached it lasts about 1.2 s; with reduced motion it is a plain fade.
+
+## Phase 2 — rules, clocks, game screen, storage
+
+### Rules (FIDE Laws of Chess, 1 Jan 2023)
+- **chess.js for move generation only.** Results are decided in `src/chess/rules.ts` and `game.ts`, because chess.js's `isDraw()` mixes claimable and automatic draws.
+- **Threefold repetition and the 50-move rule are claims** (9.2, 9.3): the human gets a "Claim draw" button when one is available; bots claim when their expected score is at most 0.5. **Fivefold and 75 moves end the game automatically** (9.6). Repetition keys follow 9.2.2: placement, side to move, castling rights and an en-passant square only when a legal en-passant capture exists.
+- **Insufficient material** (5.2.2) is "no sequence of legal moves can mate": K vs K, K+minor vs K, and K+B vs K+B with all bishops on one colour. Other dead positions (blocked pawn chains) are not detected, which FIDE allows to be settled by arbiter or agreement.
+- **Flag fall** (6.9): a loss, unless the opponent cannot mate by any series of legal moves, then a draw. The test for "cannot mate" is ported from scalachess `InsufficientMatingMaterial` (MIT), which is conservative in the same direction FIDE is.
+- **Abort**: a game that ends before both sides have moved is aborted, not lost or drawn, and never rated. Leaving a running game after that point is a loss by abandonment.
+- **Takebacks** are allowed in any game; one takeback makes the game unrated for good, shown at once in the header.
+- **Time control**: rapid, blitz and bullet are classified by the FIDE R&B definition (base + 60 × increment); only rapid can be rated, and untimed games are always casual.
+
+### Clocks and PGN
+- **The clock is timestamp-based** (`performance.now()` differences), not a ticking counter, so a throttled tab or a slow frame never loses time; the increment is added after each completed move (Fischer).
+- **PGN**: the Seven Tag Roster plus `UTCDate`, `UTCTime`, `TimeControl`, `Termination`, `SetUp/FEN` and `[%clk]` comments, lines wrapped at 80 columns, as Lichess exports them.
+
+### Game screen
+- **chessground 9** (GPL-3.0, compatible with AGPL) for the board. The squares are drawn by the app (an 8×8 grid of token colours), so the board follows the theme and the duotone board set without bitmap assets.
+- **Pieces**: chessground's cburnett set (GPL-2.0+, by Colin M.L. Burnett) and a 1-bit set generated in `tools/art/pieces1bit.ts` from the same SDF pieces as the artwork.
+- **chessground must start interactive.** It only binds its input events if `viewOnly` is false when it is created, so the board is never created view-only; read-only states (review, game over) clear `movable.color` and premoves instead.
+- **Sounds are synthesised** with WebAudio (move, capture, check, end, low-time tick), so there are no audio files to license or download.
+- **Review**: arrow keys, Home and End step through the game; a new move returns to the live position; `F` flips the board.
+- **The game always ends somewhere on record**: leaving, closing the tab (`beforeunload` asks first) and a crash all leave a stored game. On the next start an unfinished game is settled as abandoned or aborted under the same rules.
+
+### Bots' human behaviour
+- **Think time** comes from a per-move budget (remaining / expected moves left + ¾ increment), scaled by the normalised entropy of the bot's own move distribution, faster in the opening, with log-normal noise. Forced moves take 0.25–0.7 s, near-certain moves at most 2.5 s, and a bot never spends more than 6% of its remaining clock on one move or lets its clock fall below 2 s by thinking. Inference time is subtracted, so the visible pause is the planned one. "Instant bot" in Settings removes the pause.
+- **Draw offers**: with a WDL head a bot accepts from move 10 when its expected score is at most 0.47; models without a WDL head accept only dead draws (insufficient material). The human may offer once every ten plies.
+- **Resignation is rare**: never below 1000; from 1000 a bot needs an expected score of 2% or less, a material deficit of at least a queen and five such moves in a row, then resigns with probability ¼; from 1500 it needs 3%, five points down for three moves, probability ½.
+
+### Storage
+- **One `AppStorage` interface** with IndexedDB (web), SQLite through `tauri-plugin-sql` (desktop) and memory (tests, and a fallback when the browser refuses IndexedDB, e.g. some private windows; History then says that games last only until the tab closes).
+- **The rating ledger is append-only**: SQLite enforces it with `BEFORE UPDATE`/`BEFORE DELETE` triggers; IndexedDB exposes no update or delete for it. Restoring a backup is the only way to replace it, and replays it.
+- **Backup**: one JSON file (games, ledger, settings, format version) plus a PGN of every game; import validates the format before replacing anything.
+- Records are cloned through JSON on the way in, which also unwraps Svelte state proxies (IndexedDB's structured clone rejects them).
+
+## Phase 3 — model pipeline, inference worker, Model Manager
+
+### Pipeline (`tools/models`, a uv project)
+- **Every upstream input is pinned** by revision and SHA-256 in `sources.lock.json`; `dither-models fetch` refuses a file whose checksum differs.
+- **Maia-2 rapid** is taken from `maia-platform-frontend` git history (`c956db4^:public/maia2/maia_rapid.onnx`), its last published location; the ONNX is used as is.
+- **fastelo and Maia-3 are exported from PyTorch** with the dynamo exporter at opset 18 (onnxruntime-web 1.30 supports up to opset 23). Only the policy and value heads used at play time are exported.
+- **Parity**: 2,016 positions (2,000 sampled from Lichess rapid games plus 16 edge cases: promotions, en passant, castling, mates, a 99-halfmove clock), each with a rating drawn from the model's range. The reference for fastelo is its NumPy `lite` implementation (the published inference path), for Maia-3 the official PyTorch model, for Maia-2 the official preprocessing feeding the original ONNX. All four pass: top-1 agreement 100%, max |Δlogit| ≤ 2.7e-5 (`tools/models/reports/parity.md`).
+- **Golden tests in TypeScript** compare our encoders bit for bit with the Python encoders on 136 positions per model (the first 120 sampled positions plus all 16 edge cases), and run the exported ONNX through onnxruntime-web (Node) against the Python logits.
+- **Quantisation**: a float16-weights variant (weights stored as fp16, cast to fp32 once at load) and an int8 dynamic variant (MatMul/Gemm, per channel). A variant ships only if the KL divergence from the fp32 model is at most 0.01 at **every** parity position (the brief's threshold, applied to the worst position rather than the mean); the smallest passing variant becomes the pack's model.
+
+### Encodings (ported exactly)
+- **fastelo**: the side to move's perspective, castling as [own K, own Q, opponent K, opponent Q], en-passant file or 8, halfmove clock clamped at 100, ply clamped at 255, time-control token 3 (rapid). Value head = [loss, draw, win] logits.
+- **Maia-3**: eight positions, each tokenised from its own side to move's perspective (mirrored for Black) and front-padded with the earliest; self and opponent Elo as int64.
+- **Maia-2**: 18 planes on the mirrored board; Elo buckets as in Maia-2 (<1100, 100-point bands to 1999, ≥2000). The value head is a scalar in [−1, 1], mapped to an expected score; Maia-2 has no draw probability, so draw offers fall back to dead positions only.
+
+### Sampling
+- One forward pass per move, softmax of the legal-move logits at the calibrated temperature, then top-p as in Maia-3's sampler (keep moves while the cumulative probability ≤ p, always at least one), drawn from a seeded sfc32 generator; the seed is stored with the game.
+- **fastelo levels use fastelo's published calibration exactly**: conditioning Elo = level + interpolated offset (edge-clamped), temperature from the two-slope curve around 1650, the strong network mixed in only from 2100, so never at 600–1900.
+- **Maia levels are hidden until measured.** A Maia pack exposes only the levels in its calibration file from `tools/calibrate`; until then it is listed but not selectable.
+
+### Runtime
+- **One dedicated worker** runs onnxruntime-web in browser and desktop alike. WASM SIMD always; threads (up to 4, one core kept free) only when the page is cross-origin isolated, otherwise one thread.
+- **WebGPU only when an adapter exists**: the worker imports onnxruntime-web's WebGPU build (in 1.30 the native WebGPU execution provider on an asyncify WASM, 27 MB) only after `navigator.gpu.requestAdapter()` returns one, and the plain WASM build (14 MB) otherwise; a WebGPU session that fails to create falls back to WASM. Both are precached by the service worker so either works offline.
+
+### Model Manager and packs
+- **Pack format `.dpk`**: "DPK1", a JSON header listing each file's offset, size and SHA-256, then the files (`model.onnx`, `vocab.json`, `calibration.json`, `LICENSE`). One file per model keeps downloads resumable and verifiable as a unit.
+- **`models/manifest.json`** is generated by `dither-models pack` and lists id, version, sha256, size, licence, upstream revision, variant and calibrated levels.
+- **Sources**: a GitHub Release of this repository first, then a mirror. Browsers cannot follow GitHub's release redirect (no CORS headers on the asset host), so on the web the same-origin mirror (`models/packs/` next to the app) is used; the desktop app downloads in Rust and can use either. Both are editable in Models → Sources.
+- **Storage**: OPFS on the web, the app-data directory on desktop. Downloads resume with HTTP `Range` into a `.part` file; the whole pack is hashed in a worker with a streaming SHA-256 before it is moved into place.
+- **A pack is verified before every first use in a session** (cached by size and modification time); an unverified or damaged pack is never loaded, and the Models screen says why.
+- **Import from file** accepts a `.dpk` only if its size and SHA-256 match a manifest entry; anything else is refused.

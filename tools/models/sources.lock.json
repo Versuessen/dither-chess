@@ -1,0 +1,31 @@
+{
+  "fastelo": {
+    "LICENSE": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
+    "README.md": "382525c2986528e6837c01f0ae395a2ef8249093b91af911b7e6ef85b00482c1",
+    "calibration.json": "0455baa4834f4ebf47ae210d780af69fdad94328faf8682329d8504335998f9a",
+    "player.json": "3755192f10bbeeca62b25b0816e3a4c6fd4e4632c5a08def37fc51f3b66a6480",
+    "player.safetensors": "dde95fd49c15614355f0f9f6f2d06a2a5a9bf1905fdd4d92481cef1981624f82",
+    "rating_response.json": "146df91ba30d0ce655143545dfbb8897b0d48a4531952bb74ebc6bacfc9862df"
+  },
+  "fastelo-code": {
+    "commit": "65c5612d15923309a2fc6d99796da2b6efe9d897"
+  },
+  "maia2-code": {
+    "commit": "67bee6ce7e2f264344fe6d2026a2e18c76a82efa"
+  },
+  "maia2-onnx": {
+    "commit": "a6e52f5c811ee18863cb2f0e81f2433a5b9905de",
+    "maia_rapid.onnx": "027ddb8c1a8b7235b6e51827cffe325f9cb95fd4523dce65a131547c034ccfc9"
+  },
+  "maia3-23m": {
+    "README.md": "a4f1479979daac6fac58dc6119d1cd6451976b51f2b19a6d9c0eb314d10690b4",
+    "maia3-23m.pt": "bce6cd1af5f0399ac7eed33fabb7a6a2ef6193662c2740f262bf93af7bfb3569"
+  },
+  "maia3-5m": {
+    "README.md": "cccd335e2d93d50900aff29608b68a16e095827951192753f0640da9ed604e7e",
+    "maia3-5m.pt": "ba14208b2992d85502f5fb501934abf6aaaeb355e9f3fdf90e326911f562524f"
+  },
+  "maia3-code": {
+    "commit": "1e13597c42d4858b7cfd7cfdae01e297263364b2"
+  }
+}

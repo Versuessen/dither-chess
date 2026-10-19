@@ -1,0 +1,51 @@
+[project]
+name = "dither-models"
+version = "0.1.0"
+description = "Convert, verify and pack the DITHER bot models (fastelo, Maia-3, Maia-2) for onnxruntime-web."
+requires-python = ">=3.11,<3.14"
+license = "AGPL-3.0-or-later"
+dependencies = [
+  "torch>=2.6,<3",
+  "onnx>=1.17,<2",
+  "onnxruntime>=1.20,<2",
+  "onnxscript>=0.2",
+  "onnxconverter-common>=1.14",
+  "numpy>=1.26,<3",
+  "chess>=1.11,<2",
+  "safetensors>=0.4",
+  "huggingface-hub>=0.26",
+  "zstandard>=0.23",
+  # imported by the Maia-2 reference code (utils.py, inference.py)
+  "pyzstd>=0.19",
+  "pandas>=2.2",
+  "pyyaml>=6",
+  "einops>=0.8",
+  "requests>=2.32",
+  "tqdm>=4.66",
+]
+
+[project.scripts]
+dither-models = "dither_models.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dither_models"]
+
+# CI installs the CPU-only PyTorch build. Where download.pytorch.org is unreachable,
+# `uv sync --no-sources` falls back to the PyPI wheel.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

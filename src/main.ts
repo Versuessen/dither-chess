@@ -5,6 +5,7 @@ import App from './App.svelte';
 import { themeStore } from './app/themeStore.svelte';
 import { boot } from './app/boot.svelte';
 import { registerServiceWorker } from './app/platform';
+import { startBoot } from './app/bootstrap';
 
 themeStore.init();
 boot.track('fonts', document.fonts.ready, 1);
@@ -13,6 +14,8 @@ boot.track(
   Promise.all([document.fonts.load('14px "Departure Mono"'), document.fonts.load('800 40px Archivo')]),
   1
 );
+
+startBoot();
 
 const target = document.getElementById('app');
 if (!target) throw new Error('#app missing');

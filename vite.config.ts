@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
 import { serviceWorker } from './tools/vite/serviceWorker.ts';
+import { modelPacks } from './tools/vite/modelPacks.ts';
 
 /**
  * onnxruntime-web only uses WASM threads when the page is cross-origin isolated
@@ -15,7 +16,7 @@ const isolationHeaders = {
 };
 
 export default defineConfig({
-  plugins: [svelte(), serviceWorker(fileURLToPath(new URL('./src/sw/sw-template.js', import.meta.url)))],
+  plugins: [svelte(), modelPacks(fileURLToPath(new URL('.', import.meta.url))), serviceWorker(fileURLToPath(new URL('./src/sw/sw-template.js', import.meta.url)))],
   clearScreen: false,
   server: {
     port: 5173,
