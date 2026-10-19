@@ -52,6 +52,8 @@ const SUBJECT_PARALLAX = 0.014;
 const BG_PARALLAX = 0.005;
 const GRAIN_PARALLAX = 3;
 const DRIFT_STEP = 0.0042;
+/** The game backdrop keeps a slower, smaller version of the home screen's motion, at 30 fps. */
+const CALM_MOTION = { drift: 0.45, parallax: 0.55, phase: 0.35, fps: 30 } as const;
 
 type UniformName =
   | 'uRes'
@@ -400,14 +402,15 @@ export class DitherRenderer {
   private readonly tick = (now: number): void => {
     if (!this.running) return;
     this.raf = requestAnimationFrame(this.tick);
-    if (!shouldRender(now, this.lastFrame)) return;
+    const calmFps = this.mode === 'calm' && !this.opts.still ? CALM_MOTION.fps : 60;
+    if (!shouldRender(now, this.lastFrame, calmFps)) return;
     this.lastFrame = now;
     const dt = Math.min(0.1, (now - this.lastTick) / 1000);
     this.lastTick = now;
     this.step(dt);
     this.draw(now);
-    // The calm game backdrop and the portrait are still images: stop once transitions settle.
-    if ((this.mode === 'calm' || this.opts.still) && this.settled(now)) this.stop();
+    // The portrait is a still image (as is everything with reduced motion): stop once transitions settle.
+    if (this.opts.still && this.settled(now)) this.stop();
   };
 
   private step(dt: number): void {
@@ -424,14 +427,16 @@ export class DitherRenderer {
     const on = this.promotion ? 1 : 0;
     this.morphMix = approach(this.morphMix, on, dt, 0.08);
     this.morphT = this.promotion ? Math.min(1, this.morphT + dt / 0.75) : Math.max(0, this.morphT - dt / 0.35);
-    // Motion only on the live home screen.
-    const motion = live ? 1 : 0;
+    // Full motion on the live home screen, a gentler version behind the game.
+    const calm = this.mode === 'calm';
+    const motion = live ? 1 : calm ? CALM_MOTION.parallax : 0;
     this.pointerSmooth[0] = approach(this.pointerSmooth[0], this.pointer[0] * motion, dt, 0.25);
     this.pointerSmooth[1] = approach(this.pointerSmooth[1], this.pointer[1] * motion, dt, 0.25);
-    this.scrollSmooth = approach(this.scrollSmooth, this.scroll * motion, dt, 0.2);
-    if (this.mode !== 'calm' && !this.opts.still) {
-      this.phase += dt * PHASE_SPEED;
-      this.frame = (this.frame + 1) % 4096;
+    this.scrollSmooth = approach(this.scrollSmooth, this.scroll * (live ? 1 : 0), dt, 0.2);
+    if (!this.opts.still) {
+      // Behind the game the wave moves slowly and the grain holds still.
+      this.phase += dt * PHASE_SPEED * (calm ? CALM_MOTION.phase : 1);
+      if (!calm) this.frame = (this.frame + 1) % 4096;
     }
   }
 
@@ -464,9 +469,10 @@ export class DitherRenderer {
     const dissolve = Math.min(1, Math.max(0, (now - this.dissolveStart) / DISSOLVE_MS));
     if (dissolve < 1) this.dirty = true;
 
-    const still = this.reducedMotion || this.mode === 'calm' || this.opts.still === true;
+    const still = this.reducedMotion || this.opts.still === true;
     const t = (now - this.startTime) / 1000;
-    const [dx, dy] = still ? [0, 0] : this.drift.at(t);
+    const driftScale = this.mode === 'calm' ? CALM_MOTION.drift : 1;
+    const [dx, dy] = still ? [0, 0] : this.drift.at(t).map((v) => v * driftScale) as [number, number];
     const px = still ? 0 : this.pointerSmooth[0];
     const py = still ? 0 : this.pointerSmooth[1];
     const sy = still ? 0 : (this.scrollSmooth - 0.5) * 0.02;

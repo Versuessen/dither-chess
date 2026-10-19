@@ -24,6 +24,7 @@
   import { quality } from '../rating/quality.svelte';
   import { quote } from '../rating/moveQuality';
   import { rating, ratingLabel } from '../rating/rating.svelte';
+  import { loadOpenings, nameOpening, type OpeningTable } from '../chess/openings';
 
   interface Props {
     setup: GameSetup;
@@ -44,6 +45,12 @@
   let copied = $state(false);
 
   const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
+
+  let openings = $state<OpeningTable | null>(null);
+  loadOpenings().then((t) => (openings = t), () => undefined);
+  const opening = $derived(
+    openings && controller ? nameOpening(openings, [controller.game.startFen, ...controller.moves.slice(0, viewing ?? undefined).map((m) => m.fen)]) : null
+  );
 
   onMount(() => {
     let disposed = false;
@@ -385,6 +392,9 @@
           <p class="sr-only" aria-live="polite" aria-atomic="true">{announcement}</p>
 
           <div class="moves">
+            <p class="opening" data-testid="opening" title={opening ? `ECO ${opening.eco}` : undefined}>
+              {#if opening}<span class="eco">{opening.eco}</span> {opening.name}{:else}&nbsp;{/if}
+            </p>
             {#if controller}
               <MoveList moves={controller.moves} viewing={viewing ?? controller.moves.length} onselect={(p) => (viewing = p === controller!.moves.length ? null : p)} />
             {/if}
@@ -603,6 +613,20 @@
     border-top: var(--hairline) solid color-mix(in srgb, var(--panel-muted) 50%, transparent);
     border-bottom: var(--hairline) solid color-mix(in srgb, var(--panel-muted) 50%, transparent);
     padding: 6px 0;
+  }
+  .opening {
+    margin: 0 0 6px;
+    min-height: 1.3em;
+    font-size: var(--ui-size-small);
+    text-transform: none;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .eco {
+    color: var(--panel-muted);
+    letter-spacing: 0.1em;
   }
   .moves :global(ol) {
     flex: 1;

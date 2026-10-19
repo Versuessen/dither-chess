@@ -19,9 +19,9 @@
     "test:e2e": "playwright test",
     "test:static": "playwright test -c playwright.static.config.ts",
     "art": "node tools/art/render.ts",
-    "fonts": "node tools/fonts/sync.ts",
     "tauri": "tauri",
     "art:pieces": "node tools/art/pieces1bit.ts",
+    "openings": "node tools/openings/build.ts",
     "models:fetch": "node tools/packs/fetch.ts",
     "models:pack": "cd tools/models && uv run dither-models pack",
     "models:all": "cd tools/models && uv run dither-models all"

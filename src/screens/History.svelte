@@ -9,6 +9,7 @@
   import { describeTermination } from '../chess/rules';
   import { settings } from '../app/settings.svelte';
   import { rating } from '../rating/rating.svelte';
+  import { loadOpenings, nameOpening, type OpeningTable } from '../chess/openings';
 
   let games = $state<StoredGame[]>([]);
   let open = $state<string | null>(null);
@@ -20,7 +21,12 @@
     // Aborted games stay in storage (the ledger replay sees them) but are not games played.
     games = (await storage().listGames()).filter((g) => g.outcome && g.outcome.result !== '*');
   }
-  onMount(load);
+  let openings = $state<OpeningTable | null>(null);
+  onMount(() => {
+    void load();
+    loadOpenings().then((t) => (openings = t), () => undefined);
+  });
+  const openingOf = (g: StoredGame) => (openings ? nameOpening(openings, [g.startFen, ...g.moves.map((m) => m.fen)]) : null);
 
   function save(name: string, text: string, type: string) {
     const a = document.createElement('a');
@@ -122,7 +128,10 @@
         {#each games as g (g.id)}
           <tr class:open={open === g.id}>
             <td>{new Date(g.startedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</td>
-            <td class="opp">{g.botName}</td>
+            <td class="opp">
+              {g.botName}
+              {#if openingOf(g)}<span class="opening">{openingOf(g)!.name}</span>{/if}
+            </td>
             <td>{g.humanColor === 'w' ? 'White' : 'Black'}</td>
             <td>
               {formatTimeControl(g.timeControl)}
@@ -229,6 +238,16 @@
     font-weight: 800;
     font-size: 14px;
     letter-spacing: 0.01em;
+  }
+  .opp .opening {
+    display: block;
+    margin-top: 3px;
+    font-family: var(--font-ui);
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--panel-muted);
+    text-transform: none;
+    letter-spacing: 0.03em;
   }
   .score {
     font-family: var(--font-display);
