@@ -28,6 +28,8 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } }],
   webServer: {
     command: 'pnpm build && pnpm preview',
+    // Lets tests/e2e/threads.spec.ts make the preview server refuse WebAssembly thread workers.
+    env: { DITHER_TEST_HOOKS: '1' },
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 180_000

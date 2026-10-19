@@ -2,8 +2,9 @@
 #
 # Every push and pull request: type check, unit tests, end-to-end tests (the app, and the website
 # build on a plain static host). The model conversion (up to 2 hours) and the six installer builds
-# run on version tags (v*) and when started by hand (Actions → ci → Run workflow): in a private
-# repository they would use up GitHub's free Actions minutes within a few pushes.
+# run on version tags (v*) and when started by hand (Actions → ci → Run workflow, where either
+# group can be left out): in a private repository they would use up GitHub's free Actions minutes
+# within a few pushes.
 #
 # Secrets (optional; without them the RPM is signed with a throwaway key so that the
 # install-with-gpgcheck path is still exercised, and nothing is published):
@@ -17,6 +18,15 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      models:
+        description: Convert and check the models from the pinned upstream weights (about an hour)
+        type: boolean
+        default: true
+      installers:
+        description: Build and smoke-test the Windows and Fedora installers
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -48,7 +58,7 @@ jobs:
     # check that the pipeline still reproduces them. The other jobs, and the web app on Pages, use
     # the committed packs, which models/manifest.json pins by SHA-256 (a rebuilt pack embeds this
     # run's parity report, so its checksum differs).
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'workflow_dispatch' && inputs.models) || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -114,7 +124,7 @@ jobs:
             playwright-report-static/
 
   windows:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'workflow_dispatch' && inputs.installers) || startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -150,7 +160,7 @@ jobs:
             src-tauri/target/release/bundle/msi/*.msi
 
   fedora:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'workflow_dispatch' && inputs.installers) || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

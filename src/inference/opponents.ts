@@ -23,26 +23,33 @@ export interface LoadedPack {
   ratingResponse: RatingResponse | null;
 }
 
-const loaded = new Map<string, Promise<LoadedPack>>();
+/** Loads in flight (generation null) or done, with the inference worker generation they went into. */
+const loaded = new Map<string, { promise: Promise<LoadedPack>; generation: number | null }>();
 
-/** Open, verify and load a pack into the worker once per session. */
+/**
+ * Open, verify and load a pack into the worker once per session, and again if the worker had to
+ * be replaced since (inference.generation).
+ */
 export function loadPack(id: string): Promise<LoadedPack> {
-  let p = loaded.get(id);
-  if (!p) {
-    p = (async () => {
-      const dpk = await manager.openPack(id);
-      const family = dpk.header.family;
-      const [model, vocab] = await Promise.all([dpk.file('model.onnx'), dpk.json<string[]>('vocab.json')]);
-      const calibration = dpk.has('calibration.json') ? await dpk.json<FasteloCalibration | TableCalibration>('calibration.json') : null;
-      const ratingResponse = dpk.has('rating_response.json') ? await dpk.json<RatingResponse>('rating_response.json') : null;
-      await inference.load(id, family, model, vocab);
-      const pack = models.installed.find((x) => x.id === id);
-      return { id, family, sha256: pack?.sha256 ?? '', calibration, ratingResponse };
-    })();
-    p.catch(() => loaded.delete(id));
-    loaded.set(id, p);
-  }
-  return p;
+  const cached = loaded.get(id);
+  if (cached && (cached.generation === null || cached.generation === inference.generation)) return cached.promise;
+  const entry: { promise: Promise<LoadedPack>; generation: number | null } = { promise: Promise.resolve(null as never), generation: null };
+  entry.promise = (async () => {
+    const dpk = await manager.openPack(id);
+    const family = dpk.header.family;
+    const [model, vocab] = await Promise.all([dpk.file('model.onnx'), dpk.json<string[]>('vocab.json')]);
+    const calibration = dpk.has('calibration.json') ? await dpk.json<FasteloCalibration | TableCalibration>('calibration.json') : null;
+    const ratingResponse = dpk.has('rating_response.json') ? await dpk.json<RatingResponse>('rating_response.json') : null;
+    await inference.load(id, family, model, vocab);
+    entry.generation = inference.generation;
+    const pack = models.installed.find((x) => x.id === id);
+    return { id, family, sha256: pack?.sha256 ?? '', calibration, ratingResponse };
+  })();
+  entry.promise.catch(() => {
+    if (loaded.get(id) === entry) loaded.delete(id);
+  });
+  loaded.set(id, entry);
+  return entry.promise;
 }
 
 export function settingsFor(pack: LoadedPack, level: number): LevelSettings {

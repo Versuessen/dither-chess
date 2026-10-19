@@ -34,14 +34,15 @@ print("smoke OK:", sys.argv[2], "isolated" if r["crossOriginIsolated"] else "not
 PY
 }
 
+# A non-zero exit still leaves a report (a timeout says where start-up stalled); check shows it.
 export DITHER_SMOKE="$(mktemp --suffix=.json)"
-dbus-run-session -- xvfb-run -a dither
+dbus-run-session -- xvfb-run -a dither || echo "dither exited with $?"
 check "$DITHER_SMOKE"
 
 chmod +x "$appimage"
 export APPIMAGE_EXTRACT_AND_RUN=1
 export DITHER_SMOKE="$(mktemp --suffix=.json)"
-dbus-run-session -- xvfb-run -a "$appimage"
+dbus-run-session -- xvfb-run -a "$appimage" || echo "the AppImage exited with $?"
 check "$DITHER_SMOKE"
 
 dnf -y remove dither

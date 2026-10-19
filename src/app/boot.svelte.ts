@@ -45,6 +45,15 @@ class Boot {
     this.update();
   }
 
+  /** Where start-up stands, for the desktop smoke test's report when start-up stalls. */
+  snapshot() {
+    return {
+      progress: this.progress,
+      tasks: this.tasks.map((t) => ({ name: t.name, done: t.done, fraction: t.fraction })),
+      errors: this.errors
+    };
+  }
+
   /** Resolves when every task registered so far has settled (success or failure). */
   async ready(): Promise<void> {
     let n = -1;

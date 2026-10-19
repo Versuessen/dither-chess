@@ -64,15 +64,32 @@ export function startBoot(): void {
     3
   );
 
+  // Desktop smoke test: report progress while starting, so a stalled start says where it stalled.
+  const stopProgress = platform() === 'tauri' ? reportProgress() : () => undefined;
+
   // Everything else is installed and verified quietly after the preloader.
   void ready
     .then(() => boot.ready())
     .then(() => {
-      void reportBoot();
+      void reportBoot().finally(stopProgress);
       void manager.installQueued();
       return manager.verifyInstalled();
     });
   void models;
+}
+
+/**
+ * Desktop smoke test: every 2 s until the boot report, where start-up stands (tasks, model packs,
+ * install queue). The shell keeps the last one and writes it if start-up times out
+ * (src-tauri/src/smoke.rs); outside a smoke test nothing listens. Returns the stop function.
+ */
+function reportProgress(): () => void {
+  const send = async () => {
+    const { emit } = await import('@tauri-apps/api/event');
+    await emit('dither-boot-progress', { ...boot.snapshot(), packs: manager.status, queued: manager.queued, at: new Date().toISOString() });
+  };
+  const timer = setInterval(() => void send().catch(() => undefined), 2000);
+  return () => clearInterval(timer);
 }
 
 /**

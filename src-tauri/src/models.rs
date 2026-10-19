@@ -182,12 +182,16 @@ pub async fn models_install(store: State<'_, ModelStore>, pack: PackSpec, urls: 
     store.cancels.lock().map_err(err)?.insert(pack.id.clone(), cancel.clone());
     let part = store.dir.join(format!("{file}.part"));
     let result = async {
-        // Full-offline build: the pack ships as a resource.
+        // Full-offline build: the pack ships as a resource. Copying and hashing block, so they
+        // run with block_in_place: they must not hold up the runtime's workers, which also serve
+        // the database and every other command while packs install.
         if let Some(b) = &store.bundled {
             let src = b.join(&file);
             if src.is_file() {
-                std::fs::copy(&src, &part).map_err(err)?;
-                return store.finish(&part, &pack, &progress);
+                return tokio::task::block_in_place(|| {
+                    std::fs::copy(&src, &part).map_err(err)?;
+                    store.finish(&part, &pack, &progress)
+                });
             }
         }
         let client = reqwest::Client::builder().user_agent(concat!("DITHER/", env!("CARGO_PKG_VERSION"))).build().map_err(err)?;
@@ -196,7 +200,7 @@ pub async fn models_install(store: State<'_, ModelStore>, pack: PackSpec, urls: 
         let remote = |u: &&String| (u.starts_with("https://") || u.starts_with("http://")) && !u.contains("://tauri.localhost");
         for url in urls.iter().filter(remote) {
             match download(&client, url, &part, pack.size, &cancel, &progress).await {
-                Ok(()) => return store.finish(&part, &pack, &progress),
+                Ok(()) => return tokio::task::block_in_place(|| store.finish(&part, &pack, &progress)),
                 Err(e) if cancel.load(Ordering::Relaxed) => return Err(e),
                 Err(e) => last_error = format!("{url}: {e}"),
             }
@@ -310,7 +314,7 @@ pub async fn models_import_finish(store: State<'_, ModelStore>, pack: PackSpec, 
             _ => return Err("no import in progress for this pack".into()),
         }
     }
-    store.finish(&store.dir.join(format!("{name}.import")), &pack, &progress)
+    tokio::task::block_in_place(|| store.finish(&store.dir.join(format!("{name}.import")), &pack, &progress))
 }
 
 #[tauri::command]
@@ -327,7 +331,7 @@ pub async fn models_verify(store: State<'_, ModelStore>, id: String, sha256: Str
     if len != size {
         return Ok(false);
     }
-    let ok = hash_file(&path, len, &progress)? == sha;
+    let ok = tokio::task::block_in_place(|| hash_file(&path, len, &progress))? == sha;
     if ok {
         let spec = PackSpec { id: p.id, version: p.version, file: p.file, sha256: sha, size };
         store.record(&spec)?;

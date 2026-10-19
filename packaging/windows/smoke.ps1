@@ -19,7 +19,11 @@ function Run-Smoke($exe) {
   $env:DITHER_SMOKE = $report
   $p = Start-Process -FilePath $exe -PassThru
   if (-not $p.WaitForExit(300000)) { $p.Kill(); throw "the app did not exit" }
-  if ($p.ExitCode -ne 0) { throw "the app exited with $($p.ExitCode)" }
+  if ($p.ExitCode -ne 0) {
+    # A timeout report says where start-up stalled.
+    if (Test-Path $report) { Write-Host (Get-Content $report -Raw) }
+    throw "the app exited with $($p.ExitCode)"
+  }
   Check-Report $report
 }
 

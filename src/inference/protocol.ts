@@ -54,6 +54,8 @@ export interface InitResult {
   backend: Backend;
   threads: number;
   isolated: boolean;
+  /** Why inference runs on one thread although the page could have more (see client.ts). */
+  singleThreadReason?: string;
 }
 
 export interface EvaluateResult {
@@ -71,4 +73,6 @@ export interface MoveLogpResult {
 
 export type WorkerResponse =
   | { id: number; ok: true; result: unknown }
-  | { id: number; ok: false; error: string };
+  | { id: number; ok: false; error: string }
+  /** Something failed outside any request (a WebAssembly thread worker, say): the worker is unusable. */
+  | { crash: string };

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { serviceWorker } from './tools/vite/serviceWorker.ts';
 import { modelPacks } from './tools/vite/modelPacks.ts';
 import { sourceArchive, SOURCE_ARCHIVE_PATH } from './tools/vite/sourceArchive.ts';
+import { testHooks } from './tools/vite/testHooks.ts';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 
@@ -61,6 +62,7 @@ export default defineConfig({
     svelte(),
     modelPacks(root, preinstalled),
     ...(withSource ? [sourceArchive(root)] : []),
+    ...(process.env.DITHER_TEST_HOOKS === '1' ? [testHooks()] : []),
     serviceWorker(fileURLToPath(new URL('./src/sw/sw-template.js', import.meta.url)))
   ],
   clearScreen: false,

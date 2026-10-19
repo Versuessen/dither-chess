@@ -8,6 +8,8 @@
   import { ui, type MotionSetting } from '../app/ui.svelte';
   import type { ThemeSetting } from '../app/theme';
   import { settings, type BoardColours, type PieceSet, type AppSettings } from '../app/settings.svelte';
+  import { inference } from '../inference/client';
+  import type { InitResult } from '../inference/protocol';
 
   type Flag = 'coordinates' | 'sounds' | 'instantBot' | 'premoves' | 'showDests' | 'autoQueen';
   const flags: { key: Flag; label: string; hint: string }[] = [
@@ -28,8 +30,10 @@
   // The website carries the source of the exact build it runs (AGPL-3.0, see NOTICE).
   const sourceUrl = __DITHER_SOURCE__ ? `${import.meta.env.BASE_URL}${__DITHER_SOURCE__}` : null;
   let notes = $state<string[]>([]);
+  let engine = $state<InitResult | null>(null);
   onMount(() => {
     if (desktop) void import('@tauri-apps/api/core').then(({ invoke }) => invoke<string[]>('platform_notes').then((n) => (notes = n)));
+    inference.init().then((r) => (engine = r), () => undefined);
   });
 </script>
 
@@ -109,8 +113,14 @@
     <h2 id="s-system" class="label">System</h2>
     <p class="hint">
       {desktop ? 'Desktop app' : 'Browser'} · data in {storage().kind === 'sqlite' ? 'SQLite' : storage().kind === 'indexeddb' ? 'IndexedDB' : 'memory only'} ·
-      {isCrossOriginIsolated() ? 'cross-origin isolated (multi-threaded inference)' : 'not cross-origin isolated (single-threaded inference)'}
+      {isCrossOriginIsolated() ? 'cross-origin isolated' : 'not cross-origin isolated'}
+      {#if engine}
+        · inference on {engine.backend === 'webgpu' ? 'WebGPU' : 'WebAssembly'}, {engine.threads} {engine.threads === 1 ? 'thread' : 'threads'}
+      {/if}
     </p>
+    {#if engine?.singleThreadReason}
+      <p class="hint" data-testid="single-thread-reason">Multi-threaded inference failed on this device, so it runs on one thread: {engine.singleThreadReason}</p>
+    {/if}
     {#each notes as n (n)}<p class="hint">{n}</p>{/each}
     {#if sourceUrl}
       <p class="hint">
