@@ -21,8 +21,26 @@ Software (bundled in the app)
 ------------------------------------------------------------------------------------------
 chess.js 1.4.0                   BSD-2-Clause                (c) 2025 Jeff Hlywa
 chessground 9.2.1                GPL-3.0-or-later            (c) lichess.org contributors
+  including the "cburnett" piece set, GPL-2.0-or-later, (c) Colin M.L. Burnett
 onnxruntime-web 1.30.0           MIT                         (c) Microsoft Corporation
 svelte 5                         MIT                         (c) Svelte contributors
+
+Code ported into this project (src/), under the original licences:
+  src/chess/rules.ts      "cannot mate" test after scalachess InsufficientMatingMaterial
+                          (MIT, lichess.org)
+  src/inference/*         input encodings of fastelo (GPL-3.0), Maia-3 (AGPL-3.0) and
+                          Maia-2 (MIT); fastelo's calibration settings() (GPL-3.0)
+  src/rating/moveQuality  fastelo's Rater: likelihood.py and response.py (GPL-3.0)
+
+Desktop app (src-tauri), in addition:
+Tauri 2 and tauri-plugin-sql     MIT OR Apache-2.0           (c) Tauri Programme within
+                                                             The Commons Conservancy
+  The per-user MSI template src-tauri/windows/main.wxs is adapted from tauri-bundler 2.10.3.
+SQLite                           Public domain               https://sqlite.org/
+Other Rust crates                their own licences, listed by `cargo tree` from
+                                 src-tauri/Cargo.lock
+Microsoft Edge WebView2 Runtime  Microsoft software licence  included as the offline
+                                 installer in the Windows installers, not modified
 
 ------------------------------------------------------------------------------------------
 Models (downloaded or bundled as model packs; see models/manifest.json)
@@ -46,7 +64,7 @@ Data and tools (not bundled)
 ------------------------------------------------------------------------------------------
 Lichess open database            CC0                         https://database.lichess.org/
   Used by tools/calibrate for held-out positions and opening books.
-Stockfish                        GPL-3.0                     https://stockfishchess.org/
+Stockfish 19                     GPL-3.0                     https://stockfishchess.org/
   Used by tools/calibrate only, to measure move quality. Never an opponent.
 
 ------------------------------------------------------------------------------------------

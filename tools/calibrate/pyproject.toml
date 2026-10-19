@@ -1,0 +1,32 @@
+[project]
+name = "dither-calibrate"
+version = "0.1.0"
+description = "Measure the DITHER bots' strength on the Lichess rapid scale (expected-score loss vs humans, gauntlets)."
+requires-python = ">=3.11,<3.14"
+license = "AGPL-3.0-or-later"
+dependencies = [
+  "dither-models",
+  "numpy>=1.26,<3",
+  "chess>=1.11,<2",
+  "onnxruntime>=1.20,<2",
+  "zstandard>=0.23",
+]
+
+[project.scripts]
+dither-calibrate = "dither_calibrate.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dither_calibrate"]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+dither-models = { path = "../models", editable = true }
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }]

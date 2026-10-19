@@ -51,6 +51,9 @@ class ModelManager {
       this.status[s.id] = { kind: 'installed', verified: false };
     }
     this.publish();
+    // Full-offline desktop build: packs shipped with the app are installed (copied and verified) on first start.
+    const bundled = new Set((await this.store.bundled?.()) ?? []);
+    for (const p of MANIFEST.packs) if (bundled.has(p.file) && !this.stored.has(p.id)) void this.install(p.id);
   }
 
   /** Verify every installed pack once per session, in the background. */

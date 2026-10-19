@@ -50,12 +50,16 @@ describe.each(backends)('%s storage', (_name, make) => {
   it('appends to the ledger with increasing sequence numbers', async () => {
     const s = make();
     await s.init();
-    const base = { endedAt: '2026-10-01T10:00:00Z', timeZone: 'UTC', opponentRating: 1200, score: 1 as const, pgn: '', snapshot: {} };
+    const base = { kind: 'game' as const, at: '2026-10-01T10:00:00Z', timeZone: 'UTC', opponentRating: 1200, score: 1 as const, pgn: '', snapshot: {} };
     expect(await s.appendLedger({ ...base, gameId: 'a' })).toBe(1);
     expect(await s.appendLedger({ ...base, gameId: 'b' })).toBe(2);
-    expect((await s.listLedger()).map((e) => [e.seq, e.gameId])).toEqual([
+    expect(
+      await s.appendLedger({ kind: 'settings', at: '2026-10-02T10:00:00Z', timeZone: 'UTC', settings: { hypotheticalOpponent: 1600, floor1400: false, juniorBirthYear: null } })
+    ).toBe(3);
+    expect((await s.listLedger()).map((e) => [e.seq, e.kind === 'game' ? e.gameId : e.kind])).toEqual([
       [1, 'a'],
-      [2, 'b']
+      [2, 'b'],
+      [3, 'settings']
     ]);
   });
 
@@ -71,7 +75,7 @@ describe.each(backends)('%s storage', (_name, make) => {
     const s = make();
     await s.init();
     await s.putGame(game('a', '2026-10-01T10:00:00Z'));
-    await s.appendLedger({ gameId: 'a', endedAt: '2026-10-01T10:00:00Z', timeZone: 'UTC', opponentRating: 1200, score: 1, pgn: '', snapshot: {} });
+    await s.appendLedger({ kind: 'game', gameId: 'a', at: '2026-10-01T10:00:00Z', timeZone: 'UTC', opponentRating: 1200, score: 1, pgn: '', snapshot: {} });
     await s.setSetting('sound', true);
     const backup = await exportBackup(s, new Date('2026-10-19T00:00:00Z'));
     const text = JSON.stringify(backup);
@@ -102,8 +106,8 @@ describe('backup validation', () => {
           version: 1,
           games: [],
           ledger: [
-            { seq: 2, gameId: 'a', endedAt: 'x', opponentRating: 1, score: 1 },
-            { seq: 1, gameId: 'b', endedAt: 'x', opponentRating: 1, score: 0 }
+            { seq: 2, kind: 'game', gameId: 'a', at: 'x', timeZone: 'UTC', opponentRating: 1, score: 1 },
+            { seq: 1, kind: 'game', gameId: 'b', at: 'x', timeZone: 'UTC', opponentRating: 1, score: 0 }
           ],
           settings: {}
         })

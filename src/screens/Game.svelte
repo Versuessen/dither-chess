@@ -19,8 +19,10 @@
   import type { Opponent } from '../bots/opponent';
   import type { AppStorage, StoredGame } from '../storage/types';
   import { createRng } from '../lib/rng';
+  import { parseTypedMove, spokenSan } from '../game/typedMove';
   import { quality } from '../rating/quality.svelte';
   import { quote } from '../rating/moveQuality';
+  import { rating, ratingLabel } from '../rating/rating.svelte';
 
   interface Props {
     setup: GameSetup;
@@ -171,6 +173,35 @@
     promotion = null;
     board?.reset();
   }
+
+  // Keyboard move entry (SAN such as "Nf3", "exd5", "O-O", "e8=Q", or UCI such as "e2e4").
+  let typed = $state('');
+  let typedError = $state<string | null>(null);
+  function submitTyped(e: SubmitEvent) {
+    e.preventDefault();
+    const c = controller;
+    const text = typed.trim();
+    if (!c || !text) return;
+    if (!c.humanToMove || !live) {
+      typedError = 'Wait for your turn.';
+      return;
+    }
+    const uci = parseTypedMove(c.fen, text);
+    if (!uci || !c.humanMove(uci)) {
+      typedError = `${text} is not a legal move here.`;
+      return;
+    }
+    typed = '';
+    typedError = null;
+  }
+
+  /** Announcement of the latest move for screen readers. */
+  const announcement = $derived.by(() => {
+    const c = controller;
+    const m = c?.moves.at(-1);
+    if (!c || !m) return '';
+    return `${m.color === c.humanColor ? 'You played' : 'The bot played'} ${spokenSan(m.san)}`;
+  });
 
   function leave() {
     if (controller && !controller.outcome && controller.moves.length > 0 && !controller.canAbort) {
@@ -334,6 +365,7 @@
           </div>
           <Clock ms={botClock} active={controller?.clockRunning === botColor} label="Opponent's clock" />
           <div class="thinking label" aria-live="polite">{controller?.thinking ? 'Thinking' : ' '}</div>
+          <p class="sr-only" aria-live="polite" aria-atomic="true">{announcement}</p>
 
           <div class="moves">
             {#if controller}
@@ -352,6 +384,16 @@
             <section class="result" aria-live="polite">
               <p class="big">{controller.outcome.result === '*' ? 'Aborted' : controller.outcome.result}</p>
               <p class="note">{controller.resultText}{controller.outcome.result !== '*' ? (controller.rated ? ' · rated' : ' · casual') : ''}</p>
+              {#if controller.outcome.result !== '*' && controller.rated && rating.state}
+                {@const rs = rating.state}
+                <p class="note rating-line" data-testid="rating-after">
+                  Rating {ratingLabel(rs, 'live')}{rs.published !== null && rs.live !== null && rs.live !== rs.published
+                    ? ` live (${rs.live - rs.published > 0 ? '+' : ''}${rs.live - rs.published} this month)`
+                    : rs.published === null && rs.live !== null
+                      ? ' provisional'
+                      : ''}
+                </p>
+              {/if}
               {#if controller.outcome.result !== '*'}
                 {@const q = quality.status[controller.opts.id]}
                 <div class="quality" data-quality={q?.kind ?? 'none'}>
@@ -391,6 +433,19 @@
               </div>
             </div>
           {:else if controller}
+            <form class="typed" onsubmit={submitTyped}>
+              <label class="label" for="typed-move">Type a move</label>
+              <input
+                id="typed-move"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="e4, Nf3, O-O, e2e4"
+                bind:value={typed}
+                oninput={() => (typedError = null)}
+                aria-describedby="typed-error"
+              />
+              <span id="typed-error" class="typed-error" role="status">{typedError ?? ''}</span>
+            </form>
             <div class="controls">
               {#if controller.canAbort}
                 <button onclick={() => controller!.abort()}>Abort</button>
@@ -569,6 +624,34 @@
   }
   .notice {
     color: var(--panel-ink);
+  }
+  .typed {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 4px 12px;
+  }
+  .typed input {
+    min-width: 0;
+    padding: 6px 8px;
+    font: inherit;
+    font-size: var(--ui-size-small);
+    color: var(--panel-ink);
+    background: transparent;
+    border: var(--hairline) solid var(--panel-muted);
+    border-radius: var(--radius);
+  }
+  .typed input:focus-visible {
+    outline: 2px solid var(--panel-ink);
+    outline-offset: 1px;
+  }
+  .typed-error {
+    grid-column: 1 / -1;
+    min-height: 1.2em;
+    color: var(--panel-ink);
+    font-size: var(--ui-size-small);
+    text-transform: none;
+    letter-spacing: 0.04em;
   }
   .quality {
     display: grid;

@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { platform, isCrossOriginIsolated } from '../app/platform';
+  import { storage } from '../storage';
   import ScreenFrame from '../ui/ScreenFrame.svelte';
   import Toggle from '../ui/Toggle.svelte';
   import { themeStore } from '../app/themeStore.svelte';
@@ -20,6 +23,12 @@
     { value: false, label: 'Off' }
   ];
   const set = (patch: Partial<AppSettings>) => void settings.update(patch);
+
+  const desktop = platform() === 'tauri';
+  let notes = $state<string[]>([]);
+  onMount(() => {
+    if (desktop) void import('@tauri-apps/api/core').then(({ invoke }) => invoke<string[]>('platform_notes').then((n) => (notes = n)));
+  });
 </script>
 
 <ScreenFrame title="Settings" current="settings">
@@ -92,6 +101,15 @@
         </div>
       {/each}
     </div>
+  </section>
+
+  <section class="group" aria-labelledby="s-system">
+    <h2 id="s-system" class="label">System</h2>
+    <p class="hint">
+      {desktop ? 'Desktop app' : 'Browser'} · data in {storage().kind === 'sqlite' ? 'SQLite' : storage().kind === 'indexeddb' ? 'IndexedDB' : 'memory only'} ·
+      {isCrossOriginIsolated() ? 'cross-origin isolated (multi-threaded inference)' : 'not cross-origin isolated (single-threaded inference)'}
+    </p>
+    {#each notes as n (n)}<p class="hint">{n}</p>{/each}
   </section>
 </ScreenFrame>
 

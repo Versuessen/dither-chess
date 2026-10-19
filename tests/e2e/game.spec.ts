@@ -110,6 +110,13 @@ for (const pack of packs) {
     await expect(page.locator('table')).toBeVisible();
     await expect(page.locator('table tbody tr')).toHaveCount(1);
     await expect(page.locator('table tbody tr').first()).toContainText(pack.title.split(' ')[0]!);
+
+    // The game is in the rating ledger, in this month's (live) period.
+    await page.goto('/#/rating');
+    await expect(page.getByTestId('rating-value')).toHaveText(/^(Unrated \([01]\/5\))$/i);
+    const month = page.locator('table tbody tr').first();
+    await expect(month).toContainText('live');
+    await expect(month.locator('td').nth(1)).toHaveText('1');
   });
 }
 

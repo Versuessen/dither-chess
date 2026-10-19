@@ -1,5 +1,5 @@
 /** AppStorage kept in memory: used when neither IndexedDB nor SQLite is available. */
-import type { AppStorage, Backup, LedgerEntry, StoredGame } from './types';
+import type { AppStorage, Backup, LedgerEntry, LedgerEntryInput, StoredGame } from './types';
 
 /** Records are JSON by contract; a JSON round trip also unwraps reactive proxies. */
 const clone = <T>(v: T): T => (v === undefined ? v : (JSON.parse(JSON.stringify(v)) as T));
@@ -22,9 +22,9 @@ export class MemoryStorage implements AppStorage {
   async listGames(): Promise<StoredGame[]> {
     return [...this.games.values()].map((g) => clone(g)).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   }
-  async appendLedger(entry: Omit<LedgerEntry, 'seq'>): Promise<number> {
+  async appendLedger(entry: LedgerEntryInput): Promise<number> {
     const seq = (this.ledger.at(-1)?.seq ?? 0) + 1;
-    this.ledger.push({ ...clone(entry), seq });
+    this.ledger.push({ ...clone(entry), seq } as LedgerEntry);
     return seq;
   }
   async listLedger(): Promise<LedgerEntry[]> {

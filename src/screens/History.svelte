@@ -8,6 +8,7 @@
   import { formatTimeControl } from '../chess/timeControl';
   import { describeTermination } from '../chess/rules';
   import { settings } from '../app/settings.svelte';
+  import { rating } from '../rating/rating.svelte';
 
   let games = $state<StoredGame[]>([]);
   let open = $state<string | null>(null);
@@ -50,6 +51,7 @@
     try {
       const b = await importBackup(storage(), await f.text());
       await settings.load();
+      await rating.load(storage());
       await load();
       message = `Restored ${b.games.length} games and ${b.ledger.length} rated entries.`;
     } catch (err) {

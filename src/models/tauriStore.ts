@@ -73,4 +73,8 @@ export class TauriStore implements ModelStore {
   remove(id: string): Promise<void> {
     return invoke('models_remove', { id });
   }
+
+  bundled(): Promise<string[]> {
+    return invoke<string[]>('models_bundled');
+  }
 }

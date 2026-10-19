@@ -3,7 +3,7 @@
  * app data directory; the schema mirrors the IndexedDB stores, one JSON column per record.
  */
 import Database from '@tauri-apps/plugin-sql';
-import type { AppStorage, Backup, LedgerEntry, StoredGame } from './types';
+import type { AppStorage, Backup, LedgerEntry, LedgerEntryInput, StoredGame } from './types';
 
 const URL = 'sqlite:dither.db';
 
@@ -51,7 +51,7 @@ export class SqliteStorage implements AppStorage {
     return rows.map((r) => JSON.parse(r.json) as StoredGame);
   }
 
-  async appendLedger(entry: Omit<LedgerEntry, 'seq'>): Promise<number> {
+  async appendLedger(entry: LedgerEntryInput): Promise<number> {
     const rows = await this.conn.select<{ next: number }[]>('SELECT COALESCE(MAX(seq), 0) + 1 AS next FROM ledger');
     const seq = rows[0]!.next;
     await this.conn.execute('INSERT INTO ledger (seq, json) VALUES ($1, $2)', [seq, JSON.stringify({ ...entry, seq })]);

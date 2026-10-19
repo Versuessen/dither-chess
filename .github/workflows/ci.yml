@@ -1,0 +1,179 @@
+# Tests, model packs, end-to-end tests and desktop installers.
+#
+# Secrets (optional; without them the RPM is signed with a throwaway key so that the
+# install-with-gpgcheck path is still exercised, and nothing is published):
+#   RPM_SIGNING_KEY         ASCII-armoured private key used by `rpm --addsign`
+#   RPM_SIGNING_PASSPHRASE  its passphrase
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+
+  models:
+    # Converts, verifies (parity on 2,016 positions) and packs the models from pinned sources.
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GITHUB_REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/cache@v4
+        with:
+          path: tools/models/work
+          key: models-work-${{ hashFiles('tools/models/sources.lock.json', 'tools/models/src/**', 'tools/models/uv.lock') }}
+      - run: uv run dither-models all
+        working-directory: tools/models
+      - uses: actions/upload-artifact@v4
+        with:
+          name: model-packs
+          path: |
+            models/manifest.json
+            models/packs/*.dpk
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: model-reports
+          path: tools/models/reports/
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Golden tests now run the exported models through onnxruntime-web and must not skip.
+      - run: pnpm test
+        env:
+          DITHER_REQUIRE_MODELS: '1'
+
+  e2e:
+    needs: models
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: model-packs
+          path: models
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+        env:
+          CI: '1'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+
+  windows:
+    needs: models
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [standard, offline]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: model-packs
+          path: models
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      - name: Build NSIS and MSI installers
+        shell: pwsh
+        run: |
+          $extra = if ('${{ matrix.variant }}' -eq 'offline') { @('--config', 'src-tauri/tauri.offline.conf.json') } else { @() }
+          pnpm tauri build --bundles nsis,msi @extra
+      - name: Smoke-test the per-user installers
+        shell: pwsh
+        run: ./packaging/windows/smoke.ps1 -Variant ${{ matrix.variant }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.variant }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+
+  fedora:
+    needs: models
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        fedora: ['44', '45']
+        variant: [standard, offline]
+    container:
+      image: registry.fedoraproject.org/fedora:${{ matrix.fedora }}
+    steps:
+      - name: Build dependencies
+        run: |
+          dnf -y install git nodejs npm rust cargo gcc gcc-c++ make rpm-build rpm-sign gnupg2 pinentry \
+            webkit2gtk4.1-devel gtk3-devel libsoup3-devel openssl-devel librsvg2-devel libappindicator-gtk3-devel \
+            file wget xorg-x11-server-Xvfb xorg-x11-xauth mesa-dri-drivers dbus-x11 fuse-libs
+          npm install -g corepack && corepack enable
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: model-packs
+          path: models
+      - run: pnpm install --frozen-lockfile
+      - name: Build RPM and AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: |
+          extra=""
+          if [ "${{ matrix.variant }}" = offline ]; then extra="--config src-tauri/tauri.offline.conf.json"; fi
+          pnpm tauri build --bundles rpm,appimage $extra
+      - name: Sign the RPM (rpm --addsign) and verify it
+        env:
+          RPM_SIGNING_KEY: ${{ secrets.RPM_SIGNING_KEY }}
+          RPM_SIGNING_PASSPHRASE: ${{ secrets.RPM_SIGNING_PASSPHRASE }}
+        run: packaging/linux/sign-rpm.sh src-tauri/target/release/bundle/rpm/*.rpm
+      - name: Install with signature checking and smoke-test
+        run: packaging/linux/smoke.sh ${{ matrix.variant }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fedora${{ matrix.fedora }}-${{ matrix.variant }}
+          path: |
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            packaging/linux/out/dither-rpm-signing.asc

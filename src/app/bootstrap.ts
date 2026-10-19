@@ -4,6 +4,7 @@
  * loaded before the preloader ends so the first game starts at once.
  */
 import { boot } from './boot.svelte';
+import { isCrossOriginIsolated, platform } from './platform';
 import { settings } from './settings.svelte';
 import { openStorage, storage } from '../storage';
 import { manager } from '../models/manager.svelte';
@@ -13,10 +14,13 @@ import { loadPack } from '../inference/opponents';
 import { packById } from '../models/manifest';
 import { finishUnfinished, onGameFinished } from '../game/finalize';
 import { quality } from '../rating/quality.svelte';
+import { rating } from '../rating/rating.svelte';
 import { loadPrefs } from '../chess/setup';
 
 export function startBoot(): void {
-  // After every finished game, in the background: the move-quality estimate.
+  // After every finished game: the rating ledger (awaited, so the result panel can show the new
+  // rating), then the move-quality estimate in the background.
+  onGameFinished((g) => rating.record(g));
   onGameFinished((g) => {
     void quality.run(storage(), g);
   });
@@ -26,6 +30,7 @@ export function startBoot(): void {
     (async () => {
       await openStorage();
       await settings.load();
+      await rating.load(storage());
       await manager.init();
       await finishUnfinished(storage());
     })(),
@@ -51,6 +56,28 @@ export function startBoot(): void {
   );
 
   // Everything else is verified quietly after the preloader.
-  void ready.then(() => boot.ready()).then(() => manager.verifyInstalled());
+  void ready
+    .then(() => boot.ready())
+    .then(() => {
+      void reportBoot();
+      return manager.verifyInstalled();
+    });
   void models;
+}
+
+/**
+ * Desktop smoke test (DITHER_SMOKE=<file>, see src-tauri/src/lib.rs): tell the shell what came
+ * up, so an installed build can be checked without a person looking at it.
+ */
+async function reportBoot(): Promise<void> {
+  if (platform() !== 'tauri') return;
+  const { emit } = await import('@tauri-apps/api/event');
+  const init = await inference.init().catch(() => null);
+  await emit('dither-booted', {
+    storage: storage().kind,
+    crossOriginIsolated: isCrossOriginIsolated(),
+    inference: init,
+    modelStore: manager.storeKind,
+    errors: boot.errors
+  });
 }

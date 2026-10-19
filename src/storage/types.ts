@@ -49,14 +49,24 @@ export interface StoredQuality {
   curve: number[];
 }
 
-/** One rated game in the rating ledger (see rating/ledger.ts). Append-only. */
-export interface LedgerEntry {
+/**
+ * The rating ledger (rating/ledger.ts): append-only, replayed from the start to get every rating.
+ * A row is a rated game, or a change of the rating settings, which takes effect from that point.
+ */
+export type LedgerEntry = LedgerGame | LedgerSettings;
+
+interface LedgerBase {
   seq: number;
-  gameId: string;
-  /** ISO timestamp of the game's end; its local calendar month is the rating period. */
-  endedAt: string;
-  /** IANA time zone the period was assigned in. */
+  /** ISO timestamp: the game's end, or when the setting changed. */
+  at: string;
+  /** IANA time zone at that moment; its local calendar month is the rating period. */
   timeZone: string;
+}
+
+export interface LedgerGame extends LedgerBase {
+  kind: 'game';
+  gameId: string;
+  /** The bot's rating (Lichess rapid scale). */
   opponentRating: number;
   /** 1, 0.5 or 0 from the player's point of view. */
   score: 0 | 0.5 | 1;
@@ -64,6 +74,24 @@ export interface LedgerEntry {
   /** Rating state just before this game, recomputed and stored for audit. */
   snapshot: Record<string, unknown>;
 }
+
+export interface LedgerSettings extends LedgerBase {
+  kind: 'settings';
+  settings: RatingSettings;
+}
+
+/** The documented deviations from FIDE, as settings. */
+export interface RatingSettings {
+  /** Rating of the two hypothetical opponents in an initial rating (FIDE: 1800). */
+  hypotheticalOpponent: number;
+  /** FIDE's 1400 floor: below it a player is unrated again (FIDE: on; DITHER default: off). */
+  floor1400: boolean;
+  /** Birth year for FIDE's junior K-factor (K = 40 until the end of the year of the 18th birthday), or null. */
+  juniorBirthYear: number | null;
+}
+
+/** A ledger row before storage gives it a sequence number. */
+export type LedgerEntryInput = Omit<LedgerGame, 'seq'> | Omit<LedgerSettings, 'seq'>;
 
 export interface Backup {
   format: 'dither-backup';
@@ -84,7 +112,7 @@ export interface AppStorage {
   listGames(): Promise<StoredGame[]>;
 
   /** Appends with the next sequence number and returns it. Existing entries never change. */
-  appendLedger(entry: Omit<LedgerEntry, 'seq'>): Promise<number>;
+  appendLedger(entry: LedgerEntryInput): Promise<number>;
   /** Oldest first. */
   listLedger(): Promise<LedgerEntry[]>;
 

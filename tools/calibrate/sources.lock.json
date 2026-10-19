@@ -1,0 +1,15 @@
+{
+  "stockfish": {
+    "release": "sf_19",
+    "commit": "edb0d9db6731067ec50ce619ff372b463bc4dd5d",
+    "url": "https://github.com/official-stockfish/Stockfish/releases/download/sf_19/stockfish-linux-x86-64-universal.tar.gz",
+    "sha256": "9defc0d4e55d49c65a6d042f3e571a39fcea499ade6dbe741b53b8c65e03611f",
+    "binary": "stockfish/stockfish-linux-x86-64-universal",
+    "license": "GPL-3.0"
+  },
+  "lichess": {
+    "month": "2026-09",
+    "license": "CC0-1.0",
+    "note": "Held out: published after every model's training data. A fixed compressed byte prefix is read; its SHA-256 is recorded in results/positions.meta.json."
+  }
+}

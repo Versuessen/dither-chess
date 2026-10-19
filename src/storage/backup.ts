@@ -37,14 +37,20 @@ function isGame(v: unknown): v is StoredGame {
 
 function isLedgerEntry(v: unknown): v is LedgerEntry {
   const e = v as LedgerEntry;
-  return (
-    !!e &&
-    Number.isInteger(e.seq) &&
-    typeof e.gameId === 'string' &&
-    typeof e.endedAt === 'string' &&
-    typeof e.opponentRating === 'number' &&
-    (e.score === 0 || e.score === 0.5 || e.score === 1)
-  );
+  if (!e || !Number.isInteger(e.seq) || typeof e.at !== 'string' || typeof e.timeZone !== 'string') return false;
+  if (e.kind === 'game') {
+    return typeof e.gameId === 'string' && Number.isFinite(e.opponentRating) && (e.score === 0 || e.score === 0.5 || e.score === 1);
+  }
+  if (e.kind === 'settings') {
+    const s = e.settings;
+    return (
+      !!s &&
+      Number.isFinite(s.hypotheticalOpponent) &&
+      typeof s.floor1400 === 'boolean' &&
+      (s.juniorBirthYear === null || Number.isInteger(s.juniorBirthYear))
+    );
+  }
+  return false;
 }
 
 /** Validate a parsed backup file; throws with a message the UI can show. */

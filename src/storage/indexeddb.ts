@@ -1,5 +1,5 @@
 /** AppStorage on IndexedDB (web build). */
-import type { AppStorage, Backup, LedgerEntry, StoredGame } from './types';
+import type { AppStorage, Backup, LedgerEntry, LedgerEntryInput, StoredGame } from './types';
 
 /** Records are JSON by contract; a JSON round trip also unwraps reactive proxies. */
 const clone = <T>(v: T): T => (v === undefined ? v : (JSON.parse(JSON.stringify(v)) as T));
@@ -69,7 +69,7 @@ export class IndexedDbStorage implements AppStorage {
     return all.sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0));
   }
 
-  async appendLedger(entry: Omit<LedgerEntry, 'seq'>): Promise<number> {
+  async appendLedger(entry: LedgerEntryInput): Promise<number> {
     const { tx, store } = this.store('ledger', 'readwrite');
     // Sequence = last key + 1, inside the same transaction so concurrent appends cannot collide.
     const cursor = await req(store.openCursor(null, 'prev'));

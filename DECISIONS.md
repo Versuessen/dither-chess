@@ -129,3 +129,28 @@ brief could not be followed literally; the closest faithful option is described 
 - **Storage**: OPFS on the web, the app-data directory on desktop. Downloads resume with HTTP `Range` into a `.part` file; the whole pack is hashed in a worker with a streaming SHA-256 before it is moved into place.
 - **A pack is verified before every first use in a session** (cached by size and modification time); an unverified or damaged pack is never loaded, and the Models screen says why.
 - **Import from file** accepts a `.dpk` only if its size and SHA-256 match a manifest entry; anything else is refused.
+
+## Phase 4 — calibration
+
+See [CALIBRATION.md](CALIBRATION.md) for method, data and results; the decisions behind them:
+- **Held-out data**: Lichess rapid games from September 2026 (CC0), published after the training data of every model (fastelo: 2025 dumps; Maia-3: Jan 2023 – Jul 2025; Maia-2 earlier). A fixed compressed byte prefix of the monthly file is read; its SHA-256 is recorded.
+- **Stockfish 19** (official `sf_19` Linux build, SHA-256 pinned in `tools/calibrate/sources.lock.json`) is used only to score moves: every legal move at 20,000 nodes per move, as fastelo's own calibration does. It never plays.
+- **fastelo keeps its published calibration** (the brief); it is measured on the same held-out positions and in the gauntlet, not refitted.
+- **Maia-3 (5M and 23M) are fitted with fastelo's method** (`fastelo/calibrate.py`): temperature curve, then a rating-input offset per band within ±300; no strong-model mixing, since Maia has none, and no top-p (1.0), since fastelo's method has none. Both rating inputs of the model get the same value, as fastelo does.
+- **Maia-2 takes ratings in 100-point buckets**, so there is no continuous input to solve for. Deviation: every level from 1100 to 2000 uses its own bucket and a temperature solved so the expected loss equals the human loss at that rating.
+- **Calibration runs on the shipped (quantised) model** inside the pack, after the pack's checksum is verified against the manifest.
+- **Gauntlets** play the bots as the app does (same sampling, draw claims, resignation, FIDE automatic draws) from 200 openings of 8 plies taken from games of players rated 1600+, kept when Stockfish judges them within 35 cp at 2M nodes; every opening twice, colours swapped. The 95% interval comes from the scores of these game pairs.
+
+## Phase 5 — rating
+
+- **The rules are the FIDE Rapid & Blitz Rating Regulations 2024** with the shared tables of B02 (8.1.1 dp, 8.1.2 PD); both were read from handbook.fide.com on 19 Oct 2026. The R&B text has its own K rules (40 / 20 / 10, junior 40, n × K ≤ 700), the 400-point rule for everyone, and the 600-point rule above 2600 (from 1 Dec 2024).
+- **Not a FIDE rating, and labelled so**: opponents are bots rated on the Lichess rapid scale, so the number is FIDE's method on that scale ("Rapid rating · FIDE method · Lichess rapid scale").
+- **Rating period = local calendar month** (R&B 6.1: a list on the first day of each month). Each ledger row stores the time zone at the game's end, so a replay never depends on where the device is later.
+- **"Event" = one rating period** wherever the regulations speak of events (zero first event disregarded, 7.2.2; "completed events with at least 30 games", 7.3.3), since there are no tournaments.
+- **Live rating**: the published rating plus what the current month's games would change if the month ended now; for an unrated player, the provisional initial rating once five games are pooled. The published rating changes only when the month turns.
+- **Initial rating**: games pooled over at most 26 consecutive months, at least 5, average of opponents plus two hypothetical opponents with a draw each, `Ru = Ra + dp` rounded, at most 2200. Shown as "UNRATED (n/5)" until then.
+- **Deviations as settings**: the 1400 floor is off by default (FIDE: on); the hypothetical opponents' rating is 1800 by default and can be changed, and the Rating screen shows what FIDE's 1800 would give; an optional birth year enables the junior K.
+- **Settings changes are ledger rows** and apply from the month they are made, so past periods never change and a replay is deterministic.
+- **Rounding**: rating change to the nearest whole number with 0.5 away from zero (7.3.4); ΣΔR is summed in hundredths so binary floating point cannot tip a half; the initial rating rounds half up (7.2.4 says "nearest whole number"); p is rounded to the nearest hundredth for the dp table.
+- **Takebacks** are allowed in any game but make it unrated at once, so a rated game has none (the brief's "no takebacks" for rated games).
+- **Tests**: the regulations contain no worked examples, so the test cases are computed by hand from the tables with the arithmetic written next to each expectation, plus property tests (determinism, PD symmetry and monotonicity, |change| ≤ K·n, n·K ≤ 700, a better result never lowers the period's rating).

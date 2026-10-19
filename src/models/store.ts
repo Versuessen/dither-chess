@@ -33,4 +33,6 @@ export interface ModelStore {
   /** Random access to the stored pack, for reading its files. */
   open(pack: StoredPack): Promise<DpkSource>;
   remove(id: string): Promise<void>;
+  /** Pack files shipped with the app (desktop full-offline build). */
+  bundled?(): Promise<string[]>;
 }

@@ -3,8 +3,10 @@
  * so a static web host serves them from the same origin (the browser's download mirror; GitHub
  * release assets carry no CORS headers). Packs are never precached by the service worker.
  *
- * DITHER_WEB_PACKS=0 skips the copy (desktop builds fetch packs in Rust or bundle them as
- * resources). Packs missing from models/packs are reported; `pnpm models:pack` builds them.
+ * Desktop builds skip the copy (the Tauri CLI sets TAURI_ENV_PLATFORM for its build command):
+ * packs are downloaded in Rust, or bundled as resources by the full-offline variant. Setting
+ * DITHER_WEB_PACKS=0 skips it too. Packs missing from models/packs are reported; `pnpm
+ * models:pack` builds them.
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -23,7 +25,7 @@ export function modelPacks(root: string): Plugin {
       config = c;
     },
     writeBundle() {
-      if (process.env.DITHER_WEB_PACKS === '0') return;
+      if (process.env.DITHER_WEB_PACKS === '0' || process.env.TAURI_ENV_PLATFORM) return;
       const manifest = JSON.parse(readFileSync(join(root, 'models/manifest.json'), 'utf8')) as ManifestLike;
       const dest = join(config.build.outDir, 'models/packs');
       mkdirSync(dest, { recursive: true });

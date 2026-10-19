@@ -1,0 +1,76 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DITHER",
+  "version": "0.1.0",
+  "identifier": "app.dither.chess",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "DITHER",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 640,
+        "center": true,
+        "backgroundColor": "#0a0a0a"
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'wasm-unsafe-eval'",
+        "worker-src": "'self' blob:",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob:",
+        "font-src": "'self'",
+        "media-src": "'self' blob:",
+        "connect-src": "'self' ipc: http://ipc.localhost blob: data:"
+      },
+      "headers": {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+        "Cross-Origin-Resource-Policy": "same-origin"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi", "rpm", "appimage"],
+    "publisher": "DITHER contributors",
+    "copyright": "DITHER contributors; licensed under the GNU AGPL v3 or later",
+    "license": "AGPL-3.0-or-later",
+    "licenseFile": "../LICENSE",
+    "category": "BoardGame",
+    "shortDescription": "Offline chess practice against human-like neural bots",
+    "longDescription": "DITHER plays chess against bots that imitate human players of a chosen rating (fastelo, Maia-3, Maia-2), rates your rapid games with FIDE's method and runs fully offline.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "resources": {
+      "../NOTICE": "NOTICE"
+    },
+    "windows": {
+      "webviewInstallMode": { "type": "offlineInstaller" },
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      },
+      "wix": {
+        "template": "windows/main.wxs"
+      }
+    },
+    "linux": {
+      "rpm": {
+        "release": "1",
+        "depends": ["webkit2gtk4.1", "gtk3", "libsoup3"]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  }
+}
