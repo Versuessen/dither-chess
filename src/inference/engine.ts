@@ -7,6 +7,8 @@ import { encoderFor, type Encoder, type Feeds, type WDL } from './encoders';
 import { logSoftmax } from './position';
 import type { Backend, EvaluateResult, MoveLogpResult, ScoredMove } from './protocol';
 
+const WARMUP_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
 interface Loaded {
   session: Ort.InferenceSession;
   encoder: Encoder;
@@ -36,11 +38,12 @@ export class Engine {
       session = await this.ort.InferenceSession.create(model, { ...base, executionProviders: ['wasm'] });
       this.backend = 'wasm';
     }
-    this.sessions.set(packId, {
-      session,
-      encoder: encoderFor(family),
-      vocab: new Map(vocab.map((m, i) => [m, i]))
-    });
+    const encoder = encoderFor(family);
+    this.sessions.set(packId, { session, encoder, vocab: new Map(vocab.map((m, i) => [m, i])) });
+    // The first run of a session allocates its buffers and is several times slower than the rest
+    // (measured: 300–760 ms against a 130 ms median). Pay that here, behind the preloader or the
+    // game's loading state, not on the bot's first move.
+    await this.runFeeds(packId, encoder.encode({ fens: [WARMUP_FEN], eloSelf: 1500, eloOppo: 1500 }));
   }
 
   async unload(packId: string): Promise<void> {

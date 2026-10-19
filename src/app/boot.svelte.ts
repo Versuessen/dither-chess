@@ -14,6 +14,8 @@ class Boot {
   private settled: Promise<void>[] = [];
   progress = $state(0);
   errors = $state<string[]>([]);
+  /** Storage is open and settings are loaded: screens that read saved data may mount. */
+  dataReady = $state(false);
 
   track<T>(name: string, work: Promise<T>, weight = 1): Promise<T> {
     const task: Task = { name, weight, done: false };

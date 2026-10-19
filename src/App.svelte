@@ -15,6 +15,7 @@
   import { router } from './app/router.svelte';
   import { ui } from './app/ui.svelte';
   import { themeStore } from './app/themeStore.svelte';
+  import { boot } from './app/boot.svelte';
   import { personaById } from './bots/personas';
 
   let booting = $state(true);
@@ -50,17 +51,19 @@
 
 <DitherLayer />
 
+<!-- Screens that read saved data mount once boot has opened storage: a reload can land on them. -->
+
 {#if route.name === 'home' || route.name === 'bot'}
   <div class="screen" class:booting>
     <Home covered={route.name === 'bot'} />
   </div>
-{:else if route.name === 'settings'}
+{:else if route.name === 'settings' && boot.dataReady}
   <div class="screen" class:booting><Settings /></div>
-{:else if route.name === 'models'}
+{:else if route.name === 'models' && boot.dataReady}
   <div class="screen" class:booting><Models /></div>
-{:else if route.name === 'rating'}
+{:else if route.name === 'rating' && boot.dataReady}
   <div class="screen" class:booting><Rating /></div>
-{:else if route.name === 'history'}
+{:else if route.name === 'history' && boot.dataReady}
   <div class="screen" class:booting><History /></div>
 {:else if route.name === 'game' && session.pending && !booting}
   {#key session.gameNo}

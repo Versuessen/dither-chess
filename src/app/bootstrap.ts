@@ -33,7 +33,9 @@ export function startBoot(): void {
       await rating.load(storage());
       await manager.init();
       await finishUnfinished(storage());
-    })(),
+    })().finally(() => {
+      boot.dataReady = true;
+    }),
     2
   );
 

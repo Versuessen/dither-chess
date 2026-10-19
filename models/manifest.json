@@ -60,8 +60,8 @@
       "family": "maia3",
       "title": "Maia-3 5M",
       "file": "maia3-5m-1.0.0.dpk",
-      "sha256": "b20efed9bc58537217c6f6028f623ce1a4d5555637eaaef7373c2dab8a0b822c",
-      "size": 8035310,
+      "sha256": "ef3e53d99f45bcdba6da9038912d34639449c64c4834cb69e7ae64613b74d574",
+      "size": 8047539,
       "license": "AGPL-3.0",
       "source": {
         "type": "huggingface",
@@ -73,7 +73,36 @@
       "optional": false,
       "calibration": {
         "method": "tools/calibrate",
-        "levels": []
+        "levels": [
+          600,
+          650,
+          700,
+          750,
+          800,
+          850,
+          900,
+          950,
+          1000,
+          1050,
+          1100,
+          1150,
+          1200,
+          1250,
+          1300,
+          1350,
+          1400,
+          1450,
+          1500,
+          1550,
+          1600,
+          1650,
+          1700,
+          1750,
+          1800,
+          1850,
+          1900,
+          1950
+        ]
       }
     },
     {
@@ -82,8 +111,8 @@
       "family": "maia3",
       "title": "Maia-3 23M (high quality)",
       "file": "maia3-23m-1.0.0.dpk",
-      "sha256": "b315c54ac9bfadc2b691a471729708d2c477f23c6fa1dac80b4b57d3fadb5824",
-      "size": 26651378,
+      "sha256": "1c1eba1f44e0b2a26ea12344073ba2e720fe043ace5f0daf1fdea023e2e63c1d",
+      "size": 26663782,
       "license": "AGPL-3.0",
       "source": {
         "type": "huggingface",
@@ -95,7 +124,38 @@
       "optional": true,
       "calibration": {
         "method": "tools/calibrate",
-        "levels": []
+        "levels": [
+          600,
+          650,
+          700,
+          750,
+          800,
+          850,
+          900,
+          950,
+          1000,
+          1050,
+          1100,
+          1150,
+          1200,
+          1250,
+          1300,
+          1350,
+          1400,
+          1450,
+          1500,
+          1550,
+          1600,
+          1650,
+          1700,
+          1750,
+          1800,
+          1850,
+          1900,
+          1950,
+          2000,
+          2050
+        ]
       }
     },
     {
@@ -104,8 +164,8 @@
       "family": "maia2",
       "title": "Maia-2 rapid",
       "file": "maia2-rapid-1.0.0.dpk",
-      "sha256": "e21fa9354e88bfe17563100b85fa77b8423c5be275025ad298e35fe3a8c4476d",
-      "size": 41503190,
+      "sha256": "fa0e739c305e2512fa46a84b83982f6ba834eec80cc5f4a03daf15170e0f104b",
+      "size": 41510331,
       "license": "MIT (model), GPL-3.0 (ONNX export repository)",
       "source": {
         "type": "git",
@@ -117,7 +177,16 @@
       "optional": false,
       "calibration": {
         "method": "tools/calibrate",
-        "levels": []
+        "levels": [
+          1100,
+          1200,
+          1300,
+          1400,
+          1500,
+          1600,
+          1700,
+          1800
+        ]
       }
     }
   ]

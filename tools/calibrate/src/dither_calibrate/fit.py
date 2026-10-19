@@ -212,6 +212,26 @@ def _bands(c: dict, discrete: bool = False) -> list[dict]:
     return out
 
 
+def smooth_targets(bands: list[dict]) -> dict:
+    """The human loss per band, smoothed: a weighted least-squares line through log(loss) against
+    the band centre (weights 1/se² on the log scale). With 1000 positions per band, neighbouring
+    bands differ by less than their standard errors in the middle of the range, and matching each
+    band's raw value would let the rating inputs cross. The fitted curve is strictly decreasing.
+    Each band gets b["target"]; returns the fit."""
+    e = np.array([b["elo"] for b in bands])
+    y = np.log([b["human"] for b in bands])
+    w = np.array([(b["human"] / b["human_se"]) ** 2 for b in bands])  # se of log(loss) = se / loss
+    A = np.stack([np.ones_like(e), e - 1500.0], 1)
+    W = np.sqrt(w)[:, None]
+    coef = np.linalg.lstsq(A * W, y * W[:, 0], rcond=None)[0]
+    fitted = np.exp(A @ coef)
+    for b, f in zip(bands, fitted):
+        b["target"] = float(f)
+        b["target_minus_human_se"] = (float(f) - b["human"]) / b["human_se"]
+    chi2 = float((((np.log(fitted) - y) ** 2) * w).sum())
+    return dict(form="log(loss) = a + b * (rating - 1500)", a=float(coef[0]), b=float(coef[1]), chi2=chi2, dof=len(bands) - 2)
+
+
 def _clean(b: dict) -> dict:
     return {k: (round(v, 6) if isinstance(v, float) else v) for k, v in b.items() if k != "scorer"}
 
@@ -219,9 +239,10 @@ def _clean(b: dict) -> dict:
 def fit_maia3(model: str) -> dict:
     c = dict(np.load(WORK / f"cache-{model}.npz"))
     bands = _bands(c)
+    smooth = smooth_targets(bands)
     g = c["grid"]
     for b in bands:
-        b["t_match"] = solve(lambda T: b["scorer"].expected_loss(b["elo"], T), b["human"], T_MIN, T_MAX)
+        b["t_match"] = solve(lambda T: b["scorer"].expected_loss(b["elo"], T), b["target"], T_MIN, T_MAX)
     pts = np.array([(b["elo"], b["t_match"]) for b in bands if b["t_match"] is not None])
     if len(pts) < 2:
         raise SystemExit(f"{model}: no band can be matched by temperature alone")
@@ -231,15 +252,14 @@ def fit_maia3(model: str) -> dict:
         b["temperature"] = T
         lo_in = float(max(g[0], b["elo"] - MAX_CORRECTION))
         hi_in = float(min(g[-1], b["elo"] + MAX_CORRECTION))
-        b["conditioning"] = solve(lambda x: s.expected_loss(x, T), b["human"], lo_in, hi_in, increasing=False)
+        b["conditioning"] = solve(lambda x: s.expected_loss(x, T), b["target"], lo_in, hi_in, increasing=False)
         ci = b["conditioning"] if b["conditioning"] is not None else b["elo"]
         b["policy_loss"] = s.expected_loss(ci, T)
         b["raw_loss"] = s.expected_loss(b["elo"], 1.0)
         b["raw_logp"], b["raw_top1"] = s.likeness(b["elo"], 1.0)
         b["cal_logp"], b["cal_top1"] = s.likeness(ci, T)
-    # A stronger target must never get a weaker input. With a few hundred positions per band the
-    # human loss of neighbouring bands is within its own standard error, so the per-band inputs
-    # can cross; they are made non-decreasing by weighted isotonic regression (weights 1/se²).
+    # A stronger target must never get a weaker input. The smoothed targets make crossings
+    # unlikely; any that remain are removed by weighted isotonic regression (weights 1/se²).
     idx = [i for i, b in enumerate(bands) if b["conditioning"] is not None]
     mono = isotonic([bands[i]["conditioning"] for i in idx], [1 / bands[i]["human_se"] ** 2 for i in idx])
     for i, m in zip(idx, mono):
@@ -250,6 +270,7 @@ def fit_maia3(model: str) -> dict:
         b["cal_logp"], b["cal_top1"] = b["scorer"].likeness(m, b["temperature"])
     for b in bands:
         b["gap_se"] = (b["policy_loss"] - b["human"]) / b["human_se"]
+        b["gap_target"] = b["policy_loss"] - b["target"]
     knots = [dict(elo=b["elo"], conditioning=b["conditioning"], temperature=round(b["temperature"], 4)) for b in bands]
     solved = [k for k in knots if k["conditioning"] is not None]
     # Levels: every 50 points across the solved knots, plus half a band beyond each end (the
@@ -264,7 +285,8 @@ def fit_maia3(model: str) -> dict:
         levels.append(dict(level=L, eloSelf=round(cond), eloOppo=round(cond), temperature=round(temperature_at(tcurve, L), 4), topP=1.0))
     return dict(
         model=model,
-        method="fastelo calibrate.fit (expected-score loss per move matched to Lichess rapid humans), no strong-model mixing, inputs made non-decreasing",
+        method="fastelo calibrate.fit (expected-score loss per move matched to Lichess rapid humans, smoothed across bands), no strong-model mixing",
+        human_fit=smooth,
         model_sha256=str(c["model_sha256"]),
         variant=str(c["variant"]),
         temperature_curve=tcurve,
@@ -284,8 +306,9 @@ def fit_maia2(model: str) -> dict:
     match are not offered."""
     c = dict(np.load(WORK / f"cache-{model}.npz"))
     bands = _bands(c, discrete=True)
+    smooth = smooth_targets(bands)
     for b in bands:
-        b["t_match"] = solve(lambda T: b["scorer"].expected_loss(b["elo"], T), b["human"], T_MIN, T_MAX)
+        b["t_match"] = solve(lambda T: b["scorer"].expected_loss(b["elo"], T), b["target"], T_MIN, T_MAX)
         b["raw_loss"] = b["scorer"].expected_loss(b["elo"], 1.0)
         b["raw_logp"], b["raw_top1"] = b["scorer"].likeness(b["elo"], 1.0)
     pts = np.array([(b["elo"], b["t_match"]) for b in bands if b["t_match"] is not None])
@@ -308,7 +331,8 @@ def fit_maia2(model: str) -> dict:
             levels.append(dict(level=L, eloSelf=L, eloOppo=L, temperature=round(T, 4), topP=1.0))
     return dict(
         model=model,
-        method="fastelo calibrate.fit step 1 (temperature schedule matched to Lichess rapid humans); rating input = the level's own Maia-2 bucket",
+        method="fastelo calibrate.fit step 1 (temperature schedule matched to Lichess rapid humans, smoothed across bands); rating input = the level's own Maia-2 bucket",
+        human_fit=smooth,
         model_sha256=str(c["model_sha256"]),
         variant=str(c["variant"]),
         temperature_curve=tcurve,
@@ -329,6 +353,7 @@ def check_fastelo() -> dict:
     cal = runner.calibration
     assert cal is not None
     bands = _bands(c)
+    smooth = smooth_targets(bands)
     for b in bands:
         cond, T, mix = lite.settings(cal, b["elo"])
         b["conditioning"], b["temperature"] = cond, T
@@ -339,6 +364,7 @@ def check_fastelo() -> dict:
     return dict(
         model="fastelo",
         method="published calibration (fastelo calibration.json), measured on our held-out positions",
+        human_fit=smooth,
         model_sha256=str(c["model_sha256"]),
         variant=str(c["variant"]),
         bands=[_clean(b) for b in bands],
@@ -359,7 +385,7 @@ def fit(model: str) -> dict:
     print(f"wrote {dest.name}", flush=True)
     for b in out["bands"]:
         print(
-            f"  {b['band']:<10} human {100 * b['human']:5.2f}% (se {100 * b['human_se']:.2f})  raw {100 * b.get('raw_loss', float('nan')):5.2f}%"
+            f"  {b['band']:<10} human {100 * b['human']:5.2f}% (se {100 * b['human_se']:.2f}) target {100 * b.get('target', float('nan')):5.2f}%  raw {100 * b.get('raw_loss', float('nan')):5.2f}%"
             f"  policy {100 * b.get('policy_loss', float('nan')):5.2f}%  T {b.get('temperature', b.get('t_match'))}  c {b.get('conditioning')}",
             flush=True,
         )

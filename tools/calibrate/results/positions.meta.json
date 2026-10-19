@@ -1,0 +1,29 @@
+{
+ "source": {
+  "url": "https://database.lichess.org/standard/lichess_db_standard_rated_2026-09.pgn.zst",
+  "bytes": 97132544,
+  "sha256": "5d55d0d63c3fe4b8ac6950dc76017cc9dc7f35454a844c9e508d27ff799db39f"
+ },
+ "month": "2026-09",
+ "license": "CC0-1.0 (Lichess open database)",
+ "rapid_clean_games_read": 47931,
+ "positions": {
+  "600-800": 1000,
+  "800-1000": 1000,
+  "1000-1200": 1000,
+  "1200-1400": 1000,
+  "1400-1600": 1000,
+  "1600-1800": 1000,
+  "1800-2000": 1000,
+  "2000-2200": 1000,
+  "2200-2400": 1000
+ },
+ "book_candidates": 1200,
+ "rules": {
+  "min_ply": 10,
+  "min_clock_s": 30,
+  "per_band": 1000,
+  "seed": 0,
+  "one_per_player_per_game": true
+ }
+}

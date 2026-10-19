@@ -5,6 +5,8 @@
     uv run dither-calibrate book           Stockfish: 200 balanced openings for the gauntlets
     uv run dither-calibrate cache MODEL    network logits on the analysed positions
     uv run dither-calibrate fit MODEL      fastelo's method -> results/MODEL.json (fastelo: check only)
+    uv run dither-calibrate ladder MODEL   Maia: re-space levels by results (400 games per step)
+    uv run dither-calibrate ladder --refit MODEL   refit the scale with the last verification gauntlet too
     uv run dither-calibrate gauntlet MODEL 400 games per pairing -> results/gauntlet-MODEL.json
     uv run dither-calibrate report         CALIBRATION.md
     uv run dither-calibrate all            everything above, every model
@@ -29,9 +31,11 @@ def main(argv: list[str] | None = None) -> None:
     a.add_argument("--workers", type=int, default=2)
     b = sub.add_parser("book")
     b.add_argument("--workers", type=int, default=2)
-    for name in ("cache", "fit", "gauntlet"):
+    for name in ("cache", "fit", "ladder", "gauntlet"):
         s = sub.add_parser(name)
         s.add_argument("models", nargs="*", default=list(MODELS))
+        if name == "ladder":
+            s.add_argument("--refit", action="store_true", help="archive the last verification gauntlet and refit the scale with it")
     sub.add_parser("report")
     sub.add_parser("all")
     args = ap.parse_args(argv)
@@ -59,6 +63,17 @@ def main(argv: list[str] | None = None) -> None:
 
         for m in getattr(args, "models", MODELS):
             fit(m)
+    if args.cmd in ("ladder",) or every:
+        from .ladder import apply_ladder, archive_round, run_ladder
+
+        for m in getattr(args, "models", ["maia3-5m", "maia3-23m", "maia2-rapid"]):
+            if m == "fastelo":
+                continue
+            if getattr(args, "refit", False):
+                archive_round(m)
+                apply_ladder(m)
+            else:
+                run_ladder(m)
     if args.cmd in ("gauntlet",) or every:
         from .gauntlet import run_gauntlet
 

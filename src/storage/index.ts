@@ -9,10 +9,17 @@ let ready: Promise<AppStorage> | null = null;
 
 async function create(): Promise<AppStorage> {
   if (platform() === 'tauri') {
-    const { SqliteStorage } = await import('./sqlite');
-    const s = new SqliteStorage();
-    await s.init();
-    return s;
+    // A database that cannot be opened (disk full, locked, corrupt) must not take the whole app
+    // down: the session runs in memory and Settings and History say so.
+    try {
+      const { SqliteStorage } = await import('./sqlite');
+      const s = new SqliteStorage();
+      await s.init();
+      return s;
+    } catch (err) {
+      console.error('SQLite unavailable, keeping data in memory for this session:', err);
+      return new MemoryStorage();
+    }
   }
   if (typeof indexedDB !== 'undefined') {
     try {

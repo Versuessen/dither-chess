@@ -20,7 +20,8 @@ test.describe('themes', () => {
 
     await page.getByRole('link', { name: 'Settings' }).click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-    await page.getByText('Light', { exact: true }).click();
+    const theme = page.locator('fieldset', { hasText: 'Theme' });
+    await theme.getByText('Light', { exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
     expect(await token(page, '--dither-light')).toBe('#f1de52');
     expect(await token(page, '--panel')).toBe('#f5f5f2');
@@ -35,7 +36,7 @@ test.describe('themes', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
     // Back to following the system.
-    await page.getByText('System', { exact: true }).click();
+    await theme.getByText('System', { exact: true }).click();
     await page.emulateMedia({ colorScheme: 'light' });
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   });
@@ -77,13 +78,26 @@ test.describe('reduced motion', () => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await booted(page);
     await page.getByRole('link', { name: 'Settings' }).click();
-    await page.getByText('Reduce', { exact: true }).click();
+    await page.locator('fieldset', { hasText: 'Motion' }).getByText('Reduce', { exact: true }).click();
     await page.waitForTimeout(400);
     const a = await frames(page);
     await page.waitForTimeout(1200);
     expect(await frames(page)).toBe(a);
     await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduce');
   });
+});
+
+test('every screen comes up when the app is opened (or reloaded) on it', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  for (const route of ['settings', 'models', 'rating', 'history']) {
+    await page.goto(`/#/${route}`);
+    await expect(page.locator('.pre')).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 });
+  }
+  expect(errors).toEqual([]);
 });
 
 test.describe('home and bot profile', () => {

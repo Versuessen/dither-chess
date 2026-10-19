@@ -7,9 +7,12 @@ distribution in one forward pass. There is no engine, no search, no account and 
 It runs as a web app (installable PWA, offline after the first visit) and as a desktop app for
 Windows 11 and Fedora (KDE), from one codebase.
 
-- **Bots that play like people of a rating**: fastelo (600–1900), Maia-3 and Maia-2, each level
-  measured against held-out human games (see [CALIBRATION.md](CALIBRATION.md)). All ratings are on
-  the Lichess rapid scale.
+- **Bots that play like people of a rating**: fastelo (600–1900), Maia-3 5M (600–1950), Maia-3 23M
+  (600–2050, optional download) and Maia-2 (1100–1800). Every level is measured: matched to the move
+  quality of held-out human games, then (Maia) spaced by 400-game matches so that levels 200 apart
+  play 200 Elo apart. fastelo keeps its own published calibration; its matches show levels between
+  800 and 1800 playing closer together than labelled (see [CALIBRATION.md](CALIBRATION.md)). All
+  ratings are on the Lichess rapid scale.
 - **A rating by FIDE's rules**: rated rapid games are rated with the FIDE Rapid & Blitz Rating
   Regulations (monthly periods, K-factors, initial rating, 400-point rule), plus a live rating.
 - **A move-quality estimate** after each game (fastelo's Rater), shown apart from the rating.
@@ -73,7 +76,8 @@ pnpm tauri build --config src-tauri/tauri.offline.conf.json   # full-offline bui
 ```bash
 pnpm test           # unit tests: rules, clocks, PGN, rating, storage, encoders, model parity, packs
 pnpm check          # strict type check
-pnpm test:e2e       # Playwright against the production build: full rated games, offline, themes, motion
+pnpm test:e2e       # Playwright on the production build: a full rated game per model, offline session,
+                    # WCAG 2.1 AA (axe) and keyboard play, performance budgets, themes, reduced motion
 ```
 
 The model-parity tests run the exported ONNX models through onnxruntime-web when they are present in

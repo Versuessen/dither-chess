@@ -1,0 +1,455 @@
+{
+ "model": "maia3-23m",
+ "model_sha256": "bb6e86b73644033970b59b4d6915d6fabcdd1f40c0d0bdcacd9eac65eab13154",
+ "step": 200,
+ "path": {
+  "300": {
+   "eloSelf": 400,
+   "temperature": 1.2638
+  },
+  "500": {
+   "eloSelf": 522,
+   "temperature": 1.1438
+  },
+  "700": {
+   "eloSelf": 722,
+   "temperature": 1.0238
+  },
+  "900": {
+   "eloSelf": 888,
+   "temperature": 1.0238
+  },
+  "1100": {
+   "eloSelf": 1018,
+   "temperature": 1.0238
+  },
+  "1300": {
+   "eloSelf": 1319,
+   "temperature": 0.9697
+  },
+  "1500": {
+   "eloSelf": 1528,
+   "temperature": 0.9156
+  },
+  "1700": {
+   "eloSelf": 1747,
+   "temperature": 0.8614
+  },
+  "1900": {
+   "eloSelf": 1894,
+   "temperature": 0.8073
+  },
+  "2100": {
+   "eloSelf": 2143,
+   "temperature": 0.7532
+  },
+  "2300": {
+   "eloSelf": 2206,
+   "temperature": 0.699
+  },
+  "2500": {
+   "eloSelf": 2406,
+   "temperature": 0.6449
+  },
+  "2700": {
+   "eloSelf": 2606,
+   "temperature": 0.5908
+  }
+ },
+ "pairings": [
+  {
+   "low": 300,
+   "high": 500,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 254,
+   "draws": 125,
+   "high_losses": 21,
+   "score": 0.7913,
+   "se": 0.0144,
+   "ci95": [
+    0.7631,
+    0.8194
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 231.5,
+   "elo_diff_ci95": [
+    203.2,
+    262.7
+   ],
+   "mean_plies": 90.5,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "50-move rule": 1,
+    "checkmate": 275,
+    "insufficient material": 35,
+    "stalemate": 83,
+    "threefold repetition": 6
+   },
+   "seconds": 294
+  },
+  {
+   "low": 500,
+   "high": 700,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 306,
+   "draws": 62,
+   "high_losses": 32,
+   "score": 0.8425,
+   "se": 0.0156,
+   "ci95": [
+    0.812,
+    0.873
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 291.3,
+   "elo_diff_ci95": [
+    254.1,
+    334.9
+   ],
+   "mean_plies": 74.6,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "50-move rule": 1,
+    "checkmate": 338,
+    "insufficient material": 7,
+    "stalemate": 47,
+    "threefold repetition": 7
+   },
+   "seconds": 231
+  },
+  {
+   "low": 700,
+   "high": 900,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 226,
+   "draws": 67,
+   "high_losses": 107,
+   "score": 0.6488,
+   "se": 0.0216,
+   "ci95": [
+    0.6065,
+    0.691
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 106.6,
+   "elo_diff_ci95": [
+    75.1,
+    139.8
+   ],
+   "mean_plies": 78.6,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "checkmate": 333,
+    "insufficient material": 17,
+    "stalemate": 46,
+    "threefold repetition": 4
+   },
+   "seconds": 245
+  },
+  {
+   "low": 900,
+   "high": 1100,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 233,
+   "draws": 37,
+   "high_losses": 130,
+   "score": 0.6288,
+   "se": 0.0227,
+   "ci95": [
+    0.5843,
+    0.6732
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 91.5,
+   "elo_diff_ci95": [
+    59.1,
+    125.6
+   ],
+   "mean_plies": 81.3,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "50-move rule": 1,
+    "checkmate": 363,
+    "insufficient material": 8,
+    "stalemate": 27,
+    "threefold repetition": 1
+   },
+   "seconds": 256
+  },
+  {
+   "low": 1100,
+   "high": 1300,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 267,
+   "draws": 35,
+   "high_losses": 98,
+   "score": 0.7113,
+   "se": 0.0226,
+   "ci95": [
+    0.667,
+    0.7555
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 156.6,
+   "elo_diff_ci95": [
+    120.7,
+    196.0
+   ],
+   "mean_plies": 78.8,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "checkmate": 362,
+    "insufficient material": 9,
+    "resignation": 3,
+    "stalemate": 24,
+    "threefold repetition": 2
+   },
+   "seconds": 247
+  },
+  {
+   "low": 1300,
+   "high": 1500,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 261,
+   "draws": 28,
+   "high_losses": 111,
+   "score": 0.6875,
+   "se": 0.0232,
+   "ci95": [
+    0.6421,
+    0.7329
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 137.0,
+   "elo_diff_ci95": [
+    101.5,
+    175.3
+   ],
+   "mean_plies": 86.7,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "checkmate": 366,
+    "fivefold repetition": 2,
+    "insufficient material": 3,
+    "resignation": 6,
+    "stalemate": 17,
+    "threefold repetition": 6
+   },
+   "seconds": 276
+  },
+  {
+   "low": 1500,
+   "high": 1700,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 268,
+   "draws": 25,
+   "high_losses": 107,
+   "score": 0.7013,
+   "se": 0.0227,
+   "ci95": [
+    0.6567,
+    0.7458
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 148.2,
+   "elo_diff_ci95": [
+    112.7,
+    187.0
+   ],
+   "mean_plies": 89.9,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "checkmate": 344,
+    "fivefold repetition": 2,
+    "insufficient material": 8,
+    "resignation": 31,
+    "stalemate": 10,
+    "threefold repetition": 5
+   },
+   "seconds": 284
+  },
+  {
+   "low": 1700,
+   "high": 1900,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 236,
+   "draws": 37,
+   "high_losses": 127,
+   "score": 0.6362,
+   "se": 0.0219,
+   "ci95": [
+    0.5933,
+    0.6792
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 97.1,
+   "elo_diff_ci95": [
+    65.6,
+    130.3
+   ],
+   "mean_plies": 96.8,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "75-move rule": 1,
+    "checkmate": 327,
+    "fivefold repetition": 4,
+    "insufficient material": 10,
+    "resignation": 36,
+    "stalemate": 10,
+    "threefold repetition": 12
+   },
+   "seconds": 309
+  },
+  {
+   "low": 1900,
+   "high": 2100,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 252,
+   "draws": 46,
+   "high_losses": 102,
+   "score": 0.6875,
+   "se": 0.0211,
+   "ci95": [
+    0.6461,
+    0.7289
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 137.0,
+   "elo_diff_ci95": [
+    104.6,
+    171.8
+   ],
+   "mean_plies": 99.5,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "checkmate": 315,
+    "fivefold repetition": 7,
+    "insufficient material": 10,
+    "resignation": 39,
+    "stalemate": 21,
+    "threefold repetition": 8
+   },
+   "seconds": 319
+  },
+  {
+   "low": 2100,
+   "high": 2300,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 207,
+   "draws": 48,
+   "high_losses": 145,
+   "score": 0.5775,
+   "se": 0.0214,
+   "ci95": [
+    0.5355,
+    0.6195
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 54.3,
+   "elo_diff_ci95": [
+    24.7,
+    84.7
+   ],
+   "mean_plies": 104.7,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "75-move rule": 2,
+    "checkmate": 324,
+    "fivefold repetition": 6,
+    "insufficient material": 16,
+    "resignation": 28,
+    "stalemate": 12,
+    "threefold repetition": 12
+   },
+   "seconds": 330
+  },
+  {
+   "low": 2300,
+   "high": 2500,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 227,
+   "draws": 47,
+   "high_losses": 126,
+   "score": 0.6262,
+   "se": 0.0234,
+   "ci95": [
+    0.5803,
+    0.6722
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 89.7,
+   "elo_diff_ci95": [
+    56.3,
+    124.8
+   ],
+   "mean_plies": 105.2,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "50-move rule": 1,
+    "checkmate": 325,
+    "fivefold repetition": 5,
+    "insufficient material": 9,
+    "resignation": 28,
+    "stalemate": 17,
+    "threefold repetition": 15
+   },
+   "seconds": 340
+  },
+  {
+   "low": 2500,
+   "high": 2700,
+   "gap": 200,
+   "games": 400,
+   "high_wins": 207,
+   "draws": 60,
+   "high_losses": 133,
+   "score": 0.5925,
+   "se": 0.0205,
+   "ci95": [
+    0.5524,
+    0.6326
+   ],
+   "expected": 0.7597,
+   "within_ci": false,
+   "elo_diff": 65.0,
+   "elo_diff_ci95": [
+    36.5,
+    94.4
+   ],
+   "mean_plies": 110.1,
+   "inexpressible_positions": 0,
+   "terminations": {
+    "75-move rule": 1,
+    "checkmate": 305,
+    "fivefold repetition": 18,
+    "insufficient material": 12,
+    "resignation": 35,
+    "stalemate": 18,
+    "threefold repetition": 11
+   },
+   "seconds": 359
+  }
+ ]
+}

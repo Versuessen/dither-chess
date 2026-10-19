@@ -93,6 +93,11 @@ def write_report() -> None:
         "Humans of a rating band lose, on average, a certain amount per move; a bot is set so that its own expected",
         "loss per move, Σ p(move) · loss(move) over its sampled move distribution, equals that of the band.",
         "",
+        "One step is added to fastelo's method. With 1000 positions per band, the human loss of neighbouring bands in",
+        "the middle of the range differs by less than its standard error (1200–1400 and 1400–1600 even come out in the",
+        "wrong order), and matching each band's raw value made the fitted rating inputs cross. So the bots are matched to",
+        "a smoothed human curve: a weighted least-squares line through log(loss) against the band centre, weights 1/s.e.².",
+        "",
         "Then the levels are played against each other (gauntlets) to check that their spacing follows the Elo curve.",
         "",
         "### Data",
@@ -112,12 +117,19 @@ def write_report() -> None:
         L += [
             "### Human loss per band",
             "",
-            "| Band | Positions | Human loss per move (%) | ± s.e. |",
-            "|---|---|---|---|",
+            "| Band | Positions | Human loss per move (%) | ± s.e. | Smoothed target (%) | Target − human (s.e.) |",
+            "|---|---|---|---|---|---|",
         ]
         for b in check["bands"]:
-            L.append(f"| {b['band']} | {b['n']} | {_pct(b['human'])} | {_pct(b['human_se'])} |")
-        L.append("")
+            L.append(
+                f"| {b['band']} | {b['n']} | {_pct(b['human'])} | {_pct(b['human_se'])} | {_pct(b['target'])} | {b['target_minus_human_se']:+.1f} |"
+            )
+        hf = check["human_fit"]
+        L += [
+            "",
+            f"Smoothed curve: loss = exp({hf['a']:.4f} {hf['b'] * 1000:+.4f} × (rating − 1500) / 1000); χ² = {hf['chi2']:.1f} on {hf['dof']} degrees of freedom.",
+            "",
+        ]
 
     if check:
         L += [
@@ -125,16 +137,33 @@ def write_report() -> None:
             "",
             "fastelo plays with its own published calibration, used exactly. On our held-out positions its calibrated policy loses:",
             "",
-            "| Band | Human (%) | fastelo calibrated (%) | Difference in standard errors | Rating input | Temperature |",
-            "|---|---|---|---|---|---|",
+            "| Band | Human (%) | Smoothed (%) | fastelo calibrated (%) | Difference from human (s.e.) | Rating input | Temperature |",
+            "|---|---|---|---|---|---|---|",
         ]
         for b in check["bands"]:
             L.append(
-                f"| {b['band']} | {_pct(b['human'])} | {_pct(b['policy_loss'])} | {b['gap_se']:+.1f} | {b['conditioning']:.0f} | {b['temperature']:.3f} |"
+                f"| {b['band']} | {_pct(b['human'])} | {_pct(b['target'])} | {_pct(b['policy_loss'])} | {b['gap_se']:+.1f} | {b['conditioning']:.0f} | {b['temperature']:.3f} |"
             )
         L.append("")
         if gauntlets.get("fastelo"):
             L += ["### Gauntlet", ""] + _gauntlet_table(gauntlets["fastelo"]) + [""]
+            chain = sorted((r for r in gauntlets["fastelo"]["pairings"] if r["gap"] == 200), key=lambda r: r["low"])
+            pts, e = [chain[0]["low"]], [0.0]
+            for r in chain:
+                if r["low"] == pts[-1]:
+                    pts.append(r["high"])
+                    e.append(e[-1] + r["elo_diff"])
+            if len(pts) > 2:
+                k = sum(p - x for p, x in zip(pts, e)) / len(pts)
+                L += [
+                    "fastelo keeps its published calibration, as required. Its levels play closer together than their labels in",
+                    "the middle of the range. On one Elo scale from these games, anchored to the labels on average, the levels sit at:",
+                    "",
+                    "| Level | " + " | ".join(str(p) for p in pts) + " |",
+                    "|---|" + "---|" * len(pts),
+                    "| Measured | " + " | ".join(f"{x + k:.0f}" for x in e) + " |",
+                    "",
+                ]
 
     for m, f in fits.items():
         if not f:
@@ -148,31 +177,30 @@ def write_report() -> None:
         if m == "maia2-rapid":
             L += [
                 "Maia-2 takes its rating input in 100-point buckets (below 1100, 1100–1199, …, 2000 and above), so fastelo's",
-                "step 3 (a continuous rating-input correction) does not apply. Each band's temperature is matched with the",
+                "step 3 (a continuous rating-input correction) does not apply. Each band's temperature is matched to the smoothed target with the",
                 "input in the band centre's bucket, a non-increasing two-segment line is fitted through those (fastelo's step 1),",
                 "and every level uses its own bucket with the line's temperature. A level is offered only if a temperature in",
                 "[0.3, 1.5] could match its band.",
                 "",
                 sched,
                 "",
-                "| Band | Human (%) | Model at its bucket, T = 1 (%) | Temperature matching the band | Schedule | Calibrated (%) | Difference (s.e.) |",
-                "|---|---|---|---|---|---|---|",
+                "| Band | Human (%) | Target (%) | Model at its bucket, T = 1 (%) | Temperature matching the target | Schedule | Calibrated (%) | Difference from human (s.e.) |",
+                "|---|---|---|---|---|---|---|---|",
             ]
             for b in f["bands"]:
                 tm = "not reachable" if b["t_match"] is None else f"{b['t_match']:.3f}"
                 L.append(
-                    f"| {b['band']} | {_pct(b['human'])} | {_pct(b['raw_loss'])} | {tm} | {b['temperature']:.3f} | {_pct(b['policy_loss'])} | {b['gap_se']:+.1f} |"
+                    f"| {b['band']} | {_pct(b['human'])} | {_pct(b['target'])} | {_pct(b['raw_loss'])} | {tm} | {b['temperature']:.3f} | {_pct(b['policy_loss'])} | {b['gap_se']:+.1f} |"
                 )
         else:
             L += [
                 sched,
                 "",
-                "With a few hundred positions per band the human loss of neighbouring bands can differ by less than its",
-                "standard error, so the per-band rating inputs can cross. They are made non-decreasing by weighted isotonic",
-                "regression (weights 1/s.e.²); both values are shown.",
+                "Each band is matched to the smoothed target. Rating inputs that still crossed would be made non-decreasing by",
+                "weighted isotonic regression (both values shown where that happened).",
                 "",
-                "| Band | Human (%) | Model, input = band, T = 1 (%) | Temperature | Rating input (per band → used) | Offset | Calibrated (%) | Difference (s.e.) | Top-1 match raw → calibrated |",
-                "|---|---|---|---|---|---|---|---|---|",
+                "| Band | Human (%) | Target (%) | Model, input = band, T = 1 (%) | Temperature | Rating input | Offset | Calibrated (%) | Difference from human (s.e.) | Top-1 match raw → calibrated |",
+                "|---|---|---|---|---|---|---|---|---|---|",
             ]
             for b in f["bands"]:
                 c = b["conditioning"]
@@ -180,12 +208,50 @@ def write_report() -> None:
                 cin = "not reachable" if c is None else (f"{raw:.0f} → {c:.0f}" if raw is not None and round(raw) != round(c) else f"{c:.0f}")
                 off = "—" if c is None else f"{c - b['elo']:+.0f}"
                 L.append(
-                    f"| {b['band']} | {_pct(b['human'])} | {_pct(b['raw_loss'])} | {b['temperature']:.3f} | {cin} | {off} "
+                    f"| {b['band']} | {_pct(b['human'])} | {_pct(b['target'])} | {_pct(b['raw_loss'])} | {b['temperature']:.3f} | {cin} | {off} "
                     f"| {_pct(b['policy_loss'])} | {b['gap_se']:+.1f} | {100 * b['raw_top1']:.1f}% → {100 * b['cal_top1']:.1f}% |"
                 )
-        L += ["", f"Levels offered: {_levels(f['levels'])}.", ""]
+        lad = f.get("ladder")
+        if lad:
+            human_levels = f.get("levels_human", [])
+            L += [
+                "",
+                "### Re-spaced by results",
+                "",
+                f"Levels matched this way played too close together (stretch needed: ×{lad['stretch']:.2f}), so the settings were",
+                "followed along a path in steps of 200 and neighbouring points played 400 games each (the ladder). Every measured",
+                f"match ({lad.get('observations', len(lad['points']) - 1)} so far: the ladder and the checks below) puts the path on one Elo scale by weighted least",
+                f"squares, shifted ({lad['offset']:+.0f}) so that it agrees with the human-matched rating on average over 700–2300.",
+                "Each offered level uses the settings where the scale reaches that rating.",
+                "",
+                "| Path point | Rating input | Temperature | Measured rating | ± s.e. (cumulative) |",
+                "|---|---|---|---|---|",
+            ]
+            path = json.loads((RESULTS / f"ladder-{m}.json").read_text())["path"]
+            for pt in lad["points"]:
+                st = path[str(pt["path"])]
+                L.append(f"| {pt['path']} | {st['eloSelf']} | {st['temperature']:.3f} | {pt['measured']:.0f} | {pt['se']:.0f} |")
+            L += [
+                "",
+                f"Levels before re-spacing: {_levels(human_levels)}; after: {_levels(f['levels'])}.",
+                "",
+            ]
+            lg = _load(f"ladder-{m}.json")
+            if lg:
+                L += ["Ladder games (the Elo-curve column does not apply to them):", ""] + _gauntlet_table(lg)[:-3] + [""]
+        else:
+            L += ["", f"Levels offered: {_levels(f['levels'])}.", ""]
+        before = _load(f"gauntlet-{m}-human.json")
+        if before:
+            L += ["### Gauntlet before re-spacing", ""] + _gauntlet_table(before) + [""]
+        rounds = sorted(RESULTS.glob(f"gauntlet-{m}-round*.json"))
+        for i, rf in enumerate(rounds, 1):
+            L += [
+                f"### Check {i} after re-spacing (its games then joined the fit)",
+                "",
+            ] + _gauntlet_table(json.loads(rf.read_text())) + [""]
         if gauntlets.get(m):
-            L += ["### Gauntlet", ""] + _gauntlet_table(gauntlets[m]) + [""]
+            L += ["### Final check" if lad else "### Gauntlet", ""] + _gauntlet_table(gauntlets[m]) + [""]
 
     L += [
         "## Gauntlets",
@@ -199,7 +265,8 @@ def write_report() -> None:
         "The expected score of the stronger level on the Elo curve is 1 / (1 + 10^(−gap/400)). Its 95% interval is",
         "score ± 1.96 standard errors, from the scores of the 200 game pairs (one opening, both colours).",
         "",
-        "These games test the spacing between levels of one bot. The absolute level comes from the human data above.",
+        "These games test the spacing between levels of one bot. The absolute level comes from the human data above;",
+        "for the Maia bots the spacing then comes from the ladder games, and a fresh gauntlet checks the result.",
         "",
         "## Limitations",
         "",
@@ -212,7 +279,7 @@ def write_report() -> None:
         "",
         "```sh",
         "cd tools/calibrate",
-        "uv run dither-calibrate all        # positions, Stockfish analysis, book, caches, fits, gauntlets, this file",
+        "uv run dither-calibrate all        # positions, Stockfish analysis, book, caches, fits, ladders, gauntlets, this file",
         "cd ../models && uv run dither-models pack   # put the Maia calibrations into the packs",
         "```",
         "",

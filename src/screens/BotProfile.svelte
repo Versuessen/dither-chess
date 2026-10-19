@@ -118,10 +118,10 @@
   }));
   const calibrationNote = $derived(
     family === 'fastelo'
-      ? 'Strength from fastelo’s published calibration against human move-quality loss.'
+      ? 'Strength from fastelo’s published calibration, used unchanged. Its move quality matches held-out Lichess rapid games; in bot-vs-bot games, levels between 800 and 1800 play closer together than their labels.'
       : family === 'maia3'
-        ? 'Strength measured by the DITHER calibration tools; see Calibration.'
-        : 'Rating buckets from 1100 upward; strength measured by the DITHER calibration tools.'
+        ? 'Strength fitted to held-out Lichess rapid games with fastelo’s method.'
+        : 'Rating buckets from 1100 upward; temperature fitted to held-out Lichess rapid games.'
   );
 </script>
 

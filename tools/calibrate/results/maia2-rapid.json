@@ -1,0 +1,460 @@
+{
+ "model": "maia2-rapid",
+ "method": "fastelo calibrate.fit step 1 (temperature schedule matched to Lichess rapid humans, smoothed across bands); rating input = the level's own Maia-2 bucket; levels re-spaced by bot-vs-bot results (ladder), anchored to the human fit on average",
+ "human_fit": {
+  "form": "log(loss) = a + b * (rating - 1500)",
+  "a": -3.0006688056382287,
+  "b": -0.0005642828257548359,
+  "chi2": 11.394083413726724,
+  "dof": 7
+ },
+ "model_sha256": "095d81c646db11bb0128ba07e624a981c674db443518452d6cf25b9b139869c6",
+ "variant": "int8",
+ "temperature_curve": {
+  "knot": 1850.0,
+  "value": 0.7506796504610868,
+  "slope_lo": -0.0004402417615608949,
+  "slope_hi": -0.001560327896720383,
+  "t_min": 0.3,
+  "t_max": 1.5,
+  "rss": 0.023873653600206147
+ },
+ "grid": [
+  1000.0,
+  1100.0,
+  1200.0,
+  1300.0,
+  1400.0,
+  1500.0,
+  1600.0,
+  1700.0,
+  1800.0,
+  1900.0,
+  2000.0
+ ],
+ "bands": [
+  {
+   "band": "600-800",
+   "elo": 700.0,
+   "n": 1000,
+   "human": 0.075724,
+   "human_se": 0.005174,
+   "target": 0.078141,
+   "target_minus_human_se": 0.467074,
+   "t_match": 1.269726,
+   "raw_loss": 0.064064,
+   "raw_logp": -1.877357,
+   "raw_top1": 0.424,
+   "temperature": 1.256958,
+   "policy_loss": 0.077462,
+   "cal_logp": -1.860634,
+   "cal_top1": 0.424,
+   "gap_se": 0.335803
+  },
+  {
+   "band": "800-1000",
+   "elo": 900.0,
+   "n": 1000,
+   "human": 0.070303,
+   "human_se": 0.004544,
+   "target": 0.069802,
+   "target_minus_human_se": -0.110321,
+   "t_match": 1.068318,
+   "raw_loss": 0.06628,
+   "raw_logp": -1.66497,
+   "raw_top1": 0.489,
+   "temperature": 1.168909,
+   "policy_loss": 0.07515,
+   "cal_logp": -1.664935,
+   "cal_top1": 0.489,
+   "gap_se": 1.066736
+  },
+  {
+   "band": "1000-1200",
+   "elo": 1100.0,
+   "n": 1000,
+   "human": 0.05885,
+   "human_se": 0.003906,
+   "target": 0.062352,
+   "target_minus_human_se": 0.896692,
+   "t_match": 1.184428,
+   "raw_loss": 0.054396,
+   "raw_logp": -1.533009,
+   "raw_top1": 0.526,
+   "temperature": 1.080861,
+   "policy_loss": 0.057772,
+   "cal_logp": -1.52734,
+   "cal_top1": 0.526,
+   "gap_se": -0.276041
+  },
+  {
+   "band": "1200-1400",
+   "elo": 1300.0,
+   "n": 1000,
+   "human": 0.05497,
+   "human_se": 0.003735,
+   "target": 0.055698,
+   "target_minus_human_se": 0.194854,
+   "t_match": 0.994441,
+   "raw_loss": 0.055939,
+   "raw_logp": -1.429717,
+   "raw_top1": 0.544,
+   "temperature": 0.992813,
+   "policy_loss": 0.055627,
+   "cal_logp": -1.429878,
+   "cal_top1": 0.544,
+   "gap_se": 0.175971
+  },
+  {
+   "band": "1400-1600",
+   "elo": 1500.0,
+   "n": 1000,
+   "human": 0.056332,
+   "human_se": 0.003939,
+   "target": 0.049754,
+   "target_minus_human_se": -1.670039,
+   "t_match": 0.931237,
+   "raw_loss": 0.052477,
+   "raw_logp": -1.426729,
+   "raw_top1": 0.526,
+   "temperature": 0.904764,
+   "policy_loss": 0.04874,
+   "cal_logp": -1.439788,
+   "cal_top1": 0.526,
+   "gap_se": -1.92734
+  },
+  {
+   "band": "1600-1800",
+   "elo": 1700.0,
+   "n": 1000,
+   "human": 0.042984,
+   "human_se": 0.002737,
+   "target": 0.044444,
+   "target_minus_human_se": 0.533525,
+   "t_match": 0.770327,
+   "raw_loss": 0.051562,
+   "raw_logp": -1.408147,
+   "raw_top1": 0.529,
+   "temperature": 0.816716,
+   "policy_loss": 0.04573,
+   "cal_logp": -1.455134,
+   "cal_top1": 0.529,
+   "gap_se": 1.003329
+  },
+  {
+   "band": "1800-2000",
+   "elo": 1900.0,
+   "n": 1000,
+   "human": 0.044703,
+   "human_se": 0.002963,
+   "target": 0.039701,
+   "target_minus_human_se": -1.688086,
+   "t_match": 0.675843,
+   "raw_loss": 0.048906,
+   "raw_logp": -1.420079,
+   "raw_top1": 0.55,
+   "temperature": 0.672663,
+   "policy_loss": 0.039626,
+   "cal_logp": -1.591205,
+   "cal_top1": 0.55,
+   "gap_se": -1.713228
+  },
+  {
+   "band": "2000-2200",
+   "elo": 2100.0,
+   "n": 1000,
+   "human": 0.036022,
+   "human_se": 0.00227,
+   "target": 0.035464,
+   "target_minus_human_se": -0.246,
+   "t_match": 0.359962,
+   "raw_loss": 0.051159,
+   "raw_logp": -1.343442,
+   "raw_top1": 0.579,
+   "temperature": 0.360598,
+   "policy_loss": 0.035473,
+   "cal_logp": -2.201403,
+   "cal_top1": 0.579,
+   "gap_se": -0.242045
+  },
+  {
+   "band": "2200-2400",
+   "elo": 2300.0,
+   "n": 1000,
+   "human": 0.02766,
+   "human_se": 0.001957,
+   "target": 0.031679,
+   "target_minus_human_se": 2.054271,
+   "t_match": null,
+   "raw_loss": 0.051352,
+   "raw_logp": -1.353586,
+   "raw_top1": 0.555,
+   "temperature": 0.3,
+   "policy_loss": 0.036887,
+   "cal_logp": -2.523388,
+   "cal_top1": 0.555,
+   "gap_se": 4.715711
+  }
+ ],
+ "per_level": [
+  {
+   "level": 1100,
+   "band": "1000-1200",
+   "temperature": 1.0809,
+   "offered": true
+  },
+  {
+   "level": 1200,
+   "band": "1200-1400",
+   "temperature": 1.0368,
+   "offered": true
+  },
+  {
+   "level": 1300,
+   "band": "1200-1400",
+   "temperature": 0.9928,
+   "offered": true
+  },
+  {
+   "level": 1400,
+   "band": "1400-1600",
+   "temperature": 0.9488,
+   "offered": true
+  },
+  {
+   "level": 1500,
+   "band": "1400-1600",
+   "temperature": 0.9048,
+   "offered": true
+  },
+  {
+   "level": 1600,
+   "band": "1600-1800",
+   "temperature": 0.8607,
+   "offered": true
+  },
+  {
+   "level": 1700,
+   "band": "1600-1800",
+   "temperature": 0.8167,
+   "offered": true
+  },
+  {
+   "level": 1800,
+   "band": "1800-2000",
+   "temperature": 0.7727,
+   "offered": true
+  },
+  {
+   "level": 1900,
+   "band": "1800-2000",
+   "temperature": 0.6727,
+   "offered": true
+  },
+  {
+   "level": 2000,
+   "band": "2000-2200",
+   "temperature": 0.5166,
+   "offered": true
+  }
+ ],
+ "levels": [
+  {
+   "level": 1100,
+   "eloSelf": 796,
+   "eloOppo": 796,
+   "temperature": 1.2147,
+   "topP": 1.0,
+   "path": 796.0
+  },
+  {
+   "level": 1200,
+   "eloSelf": 990,
+   "eloOppo": 990,
+   "temperature": 1.1292,
+   "topP": 1.0,
+   "path": 990.2
+  },
+  {
+   "level": 1300,
+   "eloSelf": 1116,
+   "eloOppo": 1116,
+   "temperature": 1.074,
+   "topP": 1.0,
+   "path": 1115.7
+  },
+  {
+   "level": 1400,
+   "eloSelf": 1283,
+   "eloOppo": 1283,
+   "temperature": 1.0001,
+   "topP": 1.0,
+   "path": 1283.4
+  },
+  {
+   "level": 1500,
+   "eloSelf": 1455,
+   "eloOppo": 1455,
+   "temperature": 0.9245,
+   "topP": 1.0,
+   "path": 1455.2
+  },
+  {
+   "level": 1600,
+   "eloSelf": 1639,
+   "eloOppo": 1639,
+   "temperature": 0.8434,
+   "topP": 1.0,
+   "path": 1639.4
+  },
+  {
+   "level": 1700,
+   "eloSelf": 1823,
+   "eloOppo": 1823,
+   "temperature": 0.7627,
+   "topP": 1.0,
+   "path": 1822.8
+  },
+  {
+   "level": 1800,
+   "eloSelf": 2019,
+   "eloOppo": 2019,
+   "temperature": 0.4872,
+   "topP": 1.0,
+   "path": 2018.9
+  }
+ ],
+ "levels_human": [
+  {
+   "level": 1100,
+   "eloSelf": 1100,
+   "eloOppo": 1100,
+   "temperature": 1.0809,
+   "topP": 1.0
+  },
+  {
+   "level": 1200,
+   "eloSelf": 1200,
+   "eloOppo": 1200,
+   "temperature": 1.0368,
+   "topP": 1.0
+  },
+  {
+   "level": 1300,
+   "eloSelf": 1300,
+   "eloOppo": 1300,
+   "temperature": 0.9928,
+   "topP": 1.0
+  },
+  {
+   "level": 1400,
+   "eloSelf": 1400,
+   "eloOppo": 1400,
+   "temperature": 0.9488,
+   "topP": 1.0
+  },
+  {
+   "level": 1500,
+   "eloSelf": 1500,
+   "eloOppo": 1500,
+   "temperature": 0.9048,
+   "topP": 1.0
+  },
+  {
+   "level": 1600,
+   "eloSelf": 1600,
+   "eloOppo": 1600,
+   "temperature": 0.8607,
+   "topP": 1.0
+  },
+  {
+   "level": 1700,
+   "eloSelf": 1700,
+   "eloOppo": 1700,
+   "temperature": 0.8167,
+   "topP": 1.0
+  },
+  {
+   "level": 1800,
+   "eloSelf": 1800,
+   "eloOppo": 1800,
+   "temperature": 0.7727,
+   "topP": 1.0
+  },
+  {
+   "level": 1900,
+   "eloSelf": 1900,
+   "eloOppo": 1900,
+   "temperature": 0.6727,
+   "topP": 1.0
+  },
+  {
+   "level": 2000,
+   "eloSelf": 2000,
+   "eloOppo": 2000,
+   "temperature": 0.5166,
+   "topP": 1.0
+  }
+ ],
+ "ladder": {
+  "step": 200,
+  "anchor": [
+   700,
+   2300
+  ],
+  "offset": 1076.4,
+  "points": [
+   {
+    "path": 700,
+    "measured": 1076.4,
+    "se": 0.0
+   },
+   {
+    "path": 900,
+    "measured": 1125.6,
+    "se": 14.7
+   },
+   {
+    "path": 1100,
+    "measured": 1290.6,
+    "se": 21.6
+   },
+   {
+    "path": 1300,
+    "measured": 1409.9,
+    "se": 23.3
+   },
+   {
+    "path": 1500,
+    "measured": 1526.0,
+    "se": 26.5
+   },
+   {
+    "path": 1700,
+    "measured": 1632.2,
+    "se": 27.4
+   },
+   {
+    "path": 1900,
+    "measured": 1742.7,
+    "se": 30.0
+   },
+   {
+    "path": 2100,
+    "measured": 1839.1,
+    "se": 31.0
+   },
+   {
+    "path": 2300,
+    "measured": 1857.5,
+    "se": 34.8
+   }
+  ],
+  "stretch": 2.048,
+  "observations": 12,
+  "sources": [
+   "gauntlet-maia2-rapid-round1",
+   "ladder"
+  ]
+ }
+}
