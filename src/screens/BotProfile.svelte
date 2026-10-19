@@ -7,6 +7,7 @@
   import { router } from '../app/router.svelte';
   import { session } from '../app/session.svelte';
   import { models } from '../models/state.svelte';
+  import { manager } from '../models/manager.svelte';
   import { MODELS, modelInfo, nearestLevel, type ModelFamily } from '../models/catalog';
   import { loadPrefs, savePrefs, type ColourChoice } from '../chess/setup';
   import { TIME_CONTROLS, classify, formatTimeControl, isRatable, type TimeControl } from '../chess/timeControl';
@@ -32,6 +33,17 @@
   const pack = $derived(models.packFor(family));
   const info = $derived(modelInfo(family));
   const canPlay = $derived(playable.includes(level));
+  // A model the website installs by itself may still be on its way: show that instead of sending
+  // the player to the Models screen.
+  const availability = $derived(manager.availability(family));
+  const waiting = $derived(!canPlay && (availability.kind === 'busy' || availability.kind === 'queued'));
+  const playLabel = $derived.by(() => {
+    if (canPlay) return 'Play';
+    if (availability.kind === 'busy') {
+      return `${availability.phase === 'downloading' ? 'Downloading' : 'Checking'} · ${Math.floor(availability.fraction * 100)}%`;
+    }
+    return availability.kind === 'queued' ? 'Preparing model' : 'Install model';
+  });
   const rated = $derived(isRatable(timeControl));
 
   // Pick a model that covers this persona's level, and snap the level to what it covers.
@@ -60,6 +72,7 @@
 
   function play() {
     savePrefs({ family, colour, timeControl });
+    if (waiting) return;
     if (!canPlay) {
       router.go({ name: 'models' });
       return;
@@ -212,12 +225,14 @@
       <button
         class="play"
         onclick={play}
+        disabled={waiting}
+        aria-busy={waiting}
         onpointerenter={() => (ui.promotion = true)}
         onpointerleave={() => (ui.promotion = false)}
         onfocus={() => (ui.promotion = true)}
         onblur={() => (ui.promotion = false)}
       >
-        {canPlay ? 'Play' : 'Install model'}
+        {playLabel}
       </button>
     </div>
   </div>
@@ -357,6 +372,10 @@
   .play:hover,
   .play:focus-visible {
     outline-color: var(--panel-ink);
+  }
+  .play:disabled {
+    cursor: progress;
+    opacity: 0.72;
   }
 
   @media (max-width: 760px) {

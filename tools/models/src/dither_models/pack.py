@@ -127,14 +127,10 @@ def base_urls(cli: list[str] | None) -> list[str]:
     if env:
         return [u.strip() for u in env.split(",") if u.strip()]
     urls = []
-    repo = os.environ.get("GITHUB_REPOSITORY")
-    if repo:
-        owner, name = repo.split("/", 1)
-        # The packs are committed to the repository and the GitHub Pages site serves them. Once
-        # they are committed, add raw.githubusercontent.com/<repo>/<that commit>/models/packs/ as a
-        # second source by hand, so installed apps can still download them after newer packs
-        # replace them on main.
-        urls.append(f"https://{owner.lower()}.github.io/{name}/models/packs/")
+    site = os.environ.get("DITHER_SITE_URL")
+    if site:
+        # The website serves the packs (committed in models/packs); the desktop app downloads them there.
+        urls.append(f"{site.rstrip('/')}/models/packs/")
     # Mirror: the web build serves the packs next to the app (not precached by the service worker).
     urls.append("models/packs/")
     return urls

@@ -7,7 +7,8 @@ import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import type { Plugin, ResolvedConfig } from 'vite';
 
-const EXCLUDE = [/\.map$/, /^sw\.js$/, /^models\//, /\.DS_Store$/];
+// Not precached: source maps, the worker itself, model packs (OPFS holds them) and the source archive.
+const EXCLUDE = [/\.map$/, /^sw\.js$/, /^models\//, /^source\//, /\.DS_Store$/];
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {

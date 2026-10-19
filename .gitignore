@@ -1,13 +1,13 @@
 node_modules/
 dist/
-dist-pages/
+dist-static/
 dist-ssr/
 *.local
 .DS_Store
 coverage/
 test-results/
 playwright-report/
-playwright-report-pages/
+playwright-report-static/
 blob-report/
 
 # Tauri

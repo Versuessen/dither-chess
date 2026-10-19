@@ -22,13 +22,10 @@ Windows 11 and Fedora (KDE), from one codebase.
 
 ### Web
 
-Open **https://versuessen.github.io/dither-chess/** in a Chromium-based browser, Firefox or Safari,
-and install it from the address bar if you like. Go to **Models**, download a pack (fastelo is
-15 MB), and play. After that it works without a connection.
-
-The first visit reloads the page once: GitHub Pages cannot send the headers that unlock
-multi-threaded inference, so the app's service worker adds them and the page reloads to pick them
-up. Without that (or in a browser that refuses), the bots still play, single-threaded.
+Open **https://dither-chess.vercel.app** in a Chromium-based browser, Firefox or Safari, and
+install it from the address bar if you like. The first visit downloads every model by itself:
+the one for your first game while the start screen loads (fastelo, 15 MB), the others (76 MB) in
+the background while you play. After that it works without a connection.
 
 ### Windows 11
 
@@ -83,7 +80,8 @@ pnpm check          # strict type check
 pnpm models:fetch   # check models/packs against models/manifest.json (SHA-256), fetch what is missing
 pnpm test:e2e       # Playwright on the production build: a full rated game per model, offline session,
                     # WCAG 2.1 AA (axe) and keyboard play, performance budgets, themes, reduced motion
-pnpm test:pages     # the GitHub Pages build: sub-path, no COOP/COEP, service-worker isolation, offline
+pnpm test:static    # the website build on a plain static host: sub-path, no COOP/COEP (service-worker
+                    # isolation), models installing by themselves, source archive, offline
 ```
 
 The model-parity tests run the exported ONNX models through onnxruntime-web when they are present in
@@ -91,21 +89,32 @@ The model-parity tests run the exported ONNX models through onnxruntime-web when
 need the model packs in `models/packs` (committed; `pnpm models:fetch` checks them) and a Chromium
 (`pnpm exec playwright install chromium`, or point `DITHER_CHROMIUM` at one).
 
-### Website (GitHub Pages)
+### Website (Vercel)
 
-`.github/workflows/pages.yml` publishes the web app on every push to `main`: it builds for the
-repository's sub-path (`DITHER_BASE=/<repository>/`) with the committed model packs (checked
-against `models/manifest.json`), runs the type check, the unit tests and `test:pages` against the
-very files it is about to publish, then deploys them. In the repository settings, Pages' source
-must be **GitHub Actions**. The site serves the packs itself, because the isolated page cannot rely
-on cross-origin downloads; the desktop app downloads them from the site too, or from the repository
-at the commit that added them.
+The website is this repository deployed by Vercel's Git integration; `vercel.json` holds the whole
+configuration, so the Vercel project needs no settings beyond importing the repository:
 
-New model packs: build them (`pnpm models:all` with `GITHUB_REPOSITORY=<owner>/<repository>` set,
-so the manifest lists the website), commit `models/packs` and `models/manifest.json`, then add
-`https://raw.githubusercontent.com/<owner>/<repository>/<that commit>/models/packs/` to the
-manifest's sources, so installed desktop apps can still download them after newer packs replace
-them on `main`.
+- **Build**: `DITHER_PREINSTALL=all DITHER_SOURCE_ARCHIVE=1 pnpm build` into `dist`. Vercel installs
+  with the pnpm version that matches `pnpm-lock.yaml` (do not set an install command: an override
+  runs pnpm 6) and builds with Node 24.
+- **Headers**: COOP/COEP/CORP on every path, so the page is cross-origin isolated (multi-threaded
+  inference) from the first load; long caching only for hashed assets and versioned packs.
+- **Models**: the build copies the committed packs (`models/packs`) next to the app and
+  `DITHER_PREINSTALL=all` makes the site install all of them by itself (`DITHER_PREINSTALL` also
+  takes a list of pack ids). The desktop app downloads packs from the website too.
+- **Source**: `DITHER_SOURCE_ARCHIVE=1` puts the source of the build at
+  `/source/dither-source.tar.gz`, linked under Settings → System. The app is AGPL-3.0 and contains
+  GPL-3.0 and AGPL-3.0 code, so the site has to offer its source even when this repository is
+  private.
+
+Every push to `main` deploys to production; other branches and pull requests get preview
+deployments. Set up once: on vercel.com, **Add New → Project**, import this repository, keep the
+project name `dither-chess` (it becomes `dither-chess.vercel.app`), and deploy.
+
+New model packs: build them (`pnpm models:all` with `DITHER_SITE_URL=https://dither-chess.vercel.app`,
+so the manifest lists the website as their download address), then commit `models/packs` and
+`models/manifest.json`. Keep the old pack files in `models/packs` while installed desktop apps may
+still ask for them.
 
 ### Models
 

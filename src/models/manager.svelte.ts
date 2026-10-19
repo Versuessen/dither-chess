@@ -9,6 +9,7 @@ import { MANIFEST, packById, packForChecksum, resolveSource, type ManifestPack }
 import { models } from './state.svelte';
 import { OpfsStore } from './opfs';
 import { Dpk } from './dpk';
+import type { ModelFamily } from './catalog';
 import type { ModelStore, Progress, StoredPack } from './store';
 
 export type PackStatus =
@@ -17,12 +18,26 @@ export type PackStatus =
   | { kind: 'installed'; verified: boolean }
   | { kind: 'error'; message: string };
 
+/** What stands between a model family and a game. */
+export type Availability =
+  | { kind: 'ready' }
+  | { kind: 'busy'; phase: 'downloading' | 'verifying' | 'importing'; fraction: number }
+  | { kind: 'queued' }
+  | { kind: 'absent' };
+
 const SOURCES_KEY = 'model-sources';
 
 class ModelManager {
   status = $state<Record<string, PackStatus>>({});
   sources = $state<string[]>([...MANIFEST.sources]);
   storeKind = $state<'opfs' | 'tauri' | 'none'>('none');
+  /**
+   * Packs that install by themselves, in order: those the website preinstalls (DITHER_PREINSTALL)
+   * or the desktop full-offline build ships. Boot installs the first game's pack behind the
+   * preloader and the rest right after (installQueued).
+   */
+  queued = $state<string[]>([]);
+  private draining: Promise<void> | null = null;
   private store: ModelStore | null = null;
   private stored = new Map<string, StoredPack>();
   private verified = new Set<string>();
@@ -35,7 +50,7 @@ class ModelManager {
       this.store = new TauriStore();
       this.storeKind = 'tauri';
     } else if (OpfsStore.supported()) {
-      this.store = new OpfsStore();
+      this.store = new OpfsStore(__DITHER_PREINSTALL__);
       this.storeKind = 'opfs';
     } else {
       this.storeKind = 'none';
@@ -52,9 +67,34 @@ class ModelManager {
       this.status[s.id] = { kind: 'installed', verified: false };
     }
     this.publish();
-    // Full-offline desktop build: packs shipped with the app are installed (copied and verified) on first start.
+    // Calibrated packs before the optional high-quality one, otherwise in manifest order.
     const bundled = new Set((await this.store.bundled?.()) ?? []);
-    for (const p of MANIFEST.packs) if (bundled.has(p.file) && !this.stored.has(p.id)) void this.install(p.id);
+    this.queued = MANIFEST.packs
+      .filter((p) => bundled.has(p.file) && !this.stored.has(p.id))
+      .sort((a, b) => Number(!!a.optional) - Number(!!b.optional))
+      .map((p) => p.id);
+  }
+
+  /** Install every queued pack, one after another (failures stay visible on the Models screen). */
+  installQueued(): Promise<void> {
+    this.draining ??= (async () => {
+      while (this.queued.length) await this.install(this.queued[0]!);
+    })().finally(() => {
+      this.draining = null;
+    });
+    return this.draining;
+  }
+
+  availability(family: ModelFamily): Availability {
+    if (models.packFor(family)) return { kind: 'ready' };
+    const ids = MANIFEST.packs.filter((p) => p.family === family).map((p) => p.id);
+    for (const id of ids) {
+      const s = this.status[id];
+      if (s && (s.kind === 'downloading' || s.kind === 'verifying' || s.kind === 'importing')) {
+        return { kind: 'busy', phase: s.kind, fraction: s.total ? s.done / s.total : 0 };
+      }
+    }
+    return ids.some((id) => this.queued.includes(id)) ? { kind: 'queued' } : { kind: 'absent' };
   }
 
   /** Verify every installed pack once per session, in the background. */
@@ -92,17 +132,22 @@ class ModelManager {
     return this.verified.has(id);
   }
 
-  /** Download (or copy a bundled pack), verify and record. A second call while one runs joins it. */
-  install(id: string): Promise<void> {
+  /**
+   * Download (or copy a bundled pack), verify and record. A second call while one runs joins it
+   * (its `onProgress` is then not called). Never rejects: a failure is recorded in `status`.
+   * `onProgress` gets the overall fraction done, download and check together.
+   */
+  install(id: string, onProgress?: (fraction: number) => void): Promise<void> {
+    if (this.queued.includes(id)) this.queued = this.queued.filter((x) => x !== id);
     let p = this.installing.get(id);
     if (!p) {
-      p = this.runInstall(id).finally(() => this.installing.delete(id));
+      p = this.runInstall(id, onProgress).finally(() => this.installing.delete(id));
       this.installing.set(id, p);
     }
     return p;
   }
 
-  private async runInstall(id: string): Promise<void> {
+  private async runInstall(id: string, onProgress?: (fraction: number) => void): Promise<void> {
     const pack = packById(id);
     if (!pack || !this.store) return;
     const ctrl = new AbortController();
@@ -110,7 +155,16 @@ class ModelManager {
     this.status[id] = { kind: 'downloading', done: 0, total: pack.size };
     try {
       const urls = this.sources.map((s) => resolveSource(s, pack.file));
-      const stored = await this.store.install(pack, urls, (p) => this.progress(id, p), ctrl.signal);
+      const stored = await this.store.install(
+        pack,
+        urls,
+        (p) => {
+          this.progress(id, p);
+          const f = p.total ? p.done / p.total : 0;
+          onProgress?.(p.phase === 'verify' ? 0.85 + 0.15 * f : 0.85 * f);
+        },
+        ctrl.signal
+      );
       this.stored.set(id, stored);
       this.verified.add(id);
       this.status[id] = { kind: 'installed', verified: true };

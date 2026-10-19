@@ -25,6 +25,8 @@
   const set = (patch: Partial<AppSettings>) => void settings.update(patch);
 
   const desktop = platform() === 'tauri';
+  // The website carries the source of the exact build it runs (AGPL-3.0, see NOTICE).
+  const sourceUrl = __DITHER_SOURCE__ ? `${import.meta.env.BASE_URL}${__DITHER_SOURCE__}` : null;
   let notes = $state<string[]>([]);
   onMount(() => {
     if (desktop) void import('@tauri-apps/api/core').then(({ invoke }) => invoke<string[]>('platform_notes').then((n) => (notes = n)));
@@ -110,6 +112,12 @@
       {isCrossOriginIsolated() ? 'cross-origin isolated (multi-threaded inference)' : 'not cross-origin isolated (single-threaded inference)'}
     </p>
     {#each notes as n (n)}<p class="hint">{n}</p>{/each}
+    {#if sourceUrl}
+      <p class="hint">
+        DITHER is free software under the GNU Affero General Public License 3.0.
+        <a href={sourceUrl} download>Download the source code of this version</a> (licences of the models and libraries in NOTICE).
+      </p>
+    {/if}
   </section>
 </ScreenFrame>
 
@@ -134,6 +142,12 @@
     .rows.two {
       grid-template-columns: 1fr;
     }
+  }
+  /* Links inside running text are underlined so they do not rely on colour alone. */
+  .hint a {
+    color: var(--panel-ink);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
   .hint {
     margin: 8px 0 0;

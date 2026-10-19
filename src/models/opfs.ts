@@ -51,6 +51,13 @@ async function removeEntry(d: FileSystemDirectoryHandle, name: string): Promise<
 export class OpfsStore implements ModelStore {
   readonly kind = 'opfs' as const;
 
+  /** @param preinstalled pack files the website serves and installs by itself (DITHER_PREINSTALL). */
+  constructor(private readonly preinstalled: readonly string[] = []) {}
+
+  bundled(): Promise<string[]> {
+    return Promise.resolve([...this.preinstalled]);
+  }
+
   static supported(): boolean {
     return typeof navigator !== 'undefined' && !!navigator.storage?.getDirectory;
   }

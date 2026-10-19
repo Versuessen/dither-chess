@@ -1,7 +1,8 @@
 /**
- * A static file server that behaves like GitHub Pages for the end-to-end Pages test: files under
- * a sub-path, ordinary content types, byte ranges, no special headers. In particular it sends no
- * COOP/COEP, so cross-origin isolation has to come from the app's service worker, as on Pages.
+ * A plain static file server for the static-host test (tests/static): files under a sub-path,
+ * ordinary content types, byte ranges, no special headers. In particular it sends no COOP/COEP,
+ * so cross-origin isolation has to come from the app's service worker, as on any host that cannot
+ * set headers.
  *
  *   node tools/serve-static.ts <dir> <base path> <port>
  */
@@ -9,7 +10,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 
-const [dirArg = 'dist-pages', baseArg = '/dither-chess/', portArg = '4174'] = process.argv.slice(2);
+const [dirArg = 'dist-static', baseArg = '/dither/', portArg = '4174'] = process.argv.slice(2);
 const dir = resolve(dirArg);
 const base = `/${baseArg.replace(/^\/+|\/+$/g, '')}/`.replace(/^\/\/$/, '/');
 const port = Number(portArg);

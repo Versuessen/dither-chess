@@ -1,7 +1,9 @@
 /**
  * Start-up work behind the preloader: storage, settings, the model packs and the inference
  * worker. Packs are verified once per session; the most recently used one is verified and
- * loaded before the preloader ends so the first game starts at once.
+ * loaded before the preloader ends so the first game starts at once. On a website that installs
+ * its models by itself, that pack is downloaded first (the preloader shows its progress) and the
+ * others follow in the background.
  */
 import { boot } from './boot.svelte';
 import { isCrossOriginIsolated, platform } from './platform';
@@ -43,13 +45,18 @@ export function startBoot(): void {
     'inference',
     ready.then(async () => {
       await inference.init();
-      // Warm the model the player used last, if it is installed.
+      // Warm the model of the family played last: installed, or queued to install by itself.
       const family = loadPrefs().family;
       // Same preference as models.packFor: calibrated levels first, then the high-quality pack.
       const rank = (id: string) => ((packById(id)?.calibration.levels.length ?? 0) > 0 ? 2 : 0) + (packById(id)?.optional ? 1 : 0);
-      const installed = [...manager.installedIds()].sort((a, b) => rank(b.id) - rank(a.id));
-      const id = installed.find((x) => x.family === family)?.id ?? installed[0]?.id;
+      const queued = manager.queued.flatMap((id) => {
+        const p = packById(id);
+        return p ? [{ id, family: p.family }] : [];
+      });
+      const candidates = [...manager.installedIds(), ...queued].sort((a, b) => rank(b.id) - rank(a.id));
+      const id = candidates.find((x) => x.family === family)?.id ?? candidates[0]?.id;
       if (id) {
+        if (manager.queued.includes(id)) await manager.install(id, (f) => boot.partial('inference', f));
         await manager.ensureVerified(id);
         await loadPack(id);
       }
@@ -57,11 +64,12 @@ export function startBoot(): void {
     3
   );
 
-  // Everything else is verified quietly after the preloader.
+  // Everything else is installed and verified quietly after the preloader.
   void ready
     .then(() => boot.ready())
     .then(() => {
       void reportBoot();
+      void manager.installQueued();
       return manager.verifyInstalled();
     });
   void models;
