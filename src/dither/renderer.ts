@@ -203,7 +203,8 @@ export class DitherRenderer {
       reveal: mode === 'black' ? 0 : 1,
       calm: mode === 'calm' ? 1 : 0
     };
-    if (this.reducedMotion) this.modeValues = { ...this.modeTargets };
+    // Still images (the portrait) appear at once; only the full-screen layer fades and reveals.
+    if (this.reducedMotion || this.opts.still) this.modeValues = { ...this.modeTargets };
     this.invalidate();
   }
 
