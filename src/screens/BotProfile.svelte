@@ -153,7 +153,7 @@
 >
   <header class="head">
     <span>Bot profile</span>
-    <button class="close" onclick={close}>Close</button>
+    <button class="close" data-sound="back" onclick={close}>Close</button>
   </header>
   <hr />
   <div class="top">
@@ -237,6 +237,7 @@
       </div>
       <button
         class="play"
+        data-sound="confirm"
         onclick={play}
         disabled={waiting}
         aria-busy={waiting}

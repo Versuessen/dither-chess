@@ -13,13 +13,14 @@
   import { inference } from '../inference/client';
   import type { InitResult } from '../inference/protocol';
 
-  type Flag = 'coordinates' | 'sounds' | 'instantBot' | 'premoves' | 'showDests' | 'autoQueen';
+  type Flag = 'coordinates' | 'sounds' | 'music' | 'instantBot' | 'premoves' | 'showDests' | 'autoQueen';
   const flags: { key: Flag; label: string; hint: string }[] = [
     { key: 'coordinates', label: 'Coordinates', hint: 'Files and ranks on the board edge.' },
     { key: 'showDests', label: 'Legal moves', hint: 'Dots on the squares a picked-up piece can reach.' },
     { key: 'premoves', label: 'Premoves', hint: 'Queue a move while the bot is thinking.' },
     { key: 'autoQueen', label: 'Auto-queen', hint: 'Promote to a queen without asking.' },
-    { key: 'sounds', label: 'Sounds', hint: 'Quiet clicks for moves, captures and checks.' },
+    { key: 'sounds', label: 'Sounds', hint: 'Wooden knocks for moves and captures, soft tones for checks and the interface.' },
+    { key: 'music', label: 'Music', hint: 'Quiet ambient music with long pauses, on every screen.' },
     { key: 'instantBot', label: 'Instant bot', hint: 'The bot moves as soon as it has chosen, without a human-like pause.' }
   ];
   const onOff = [

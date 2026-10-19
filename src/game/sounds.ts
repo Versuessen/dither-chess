@@ -1,12 +1,28 @@
 /**
- * Subtle game sounds, synthesised with Web Audio so there are no sample files to license or
- * cache: a wooden click for a move, a heavier double knock for a capture, a short tone for
- * check, a soft tick under ten seconds, and a two-note chord at the end of the game.
+ * Sounds: short CC0 samples (public/sounds, sources in NOTICE) played through Web Audio, and an
+ * optional quiet music bed (public/music). Nothing loads until the first sound is wanted; the
+ * service worker caches the files for offline play.
  */
 
-export type SoundName = 'move' | 'capture' | 'check' | 'low-time' | 'end';
+export type SoundName =
+  | 'move'
+  | 'capture'
+  | 'castle'
+  | 'check'
+  | 'promote'
+  | 'low-time'
+  | 'illegal'
+  | 'start'
+  | 'end'
+  | 'select'
+  | 'confirm'
+  | 'back';
+
+const SOUNDS: readonly SoundName[] = ['move', 'capture', 'castle', 'check', 'promote', 'low-time', 'illegal', 'start', 'end', 'select', 'confirm', 'back'];
+const MUSIC = ['the-divine-elf', 'suspended'] as const;
 
 let ctx: AudioContext | null = null;
+const buffers = new Map<string, Promise<AudioBuffer | null>>();
 
 function audio(): AudioContext | null {
   if (typeof AudioContext === 'undefined') return null;
@@ -15,71 +31,127 @@ function audio(): AudioContext | null {
   return ctx;
 }
 
-function click(ac: AudioContext, at: number, freq: number, gain: number, decay: number): void {
-  const len = Math.floor(ac.sampleRate * decay);
-  const buf = ac.createBuffer(1, len, ac.sampleRate);
-  const data = buf.getChannelData(0);
-  // Deterministic noise burst with an exponential envelope.
-  let seed = 22222;
-  for (let i = 0; i < len; i++) {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    data[i] = ((seed / 0x7fffffff) * 2 - 1) * Math.exp((-6 * i) / len);
+function url(path: string): string {
+  return `${import.meta.env.BASE_URL}${path}`;
+}
+
+function buffer(ac: AudioContext, path: string): Promise<AudioBuffer | null> {
+  let p = buffers.get(path);
+  if (!p) {
+    p = fetch(url(path))
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`${path}: ${r.status}`))))
+      .then((b) => ac.decodeAudioData(b))
+      .catch(() => null);
+    buffers.set(path, p);
   }
-  const src = ac.createBufferSource();
-  src.buffer = buf;
-  const band = ac.createBiquadFilter();
-  band.type = 'bandpass';
-  band.frequency.value = freq;
-  band.Q.value = 3.5;
-  const g = ac.createGain();
-  g.gain.value = gain;
-  src.connect(band).connect(g).connect(ac.destination);
-  src.start(at);
+  return p;
 }
 
-function tone(ac: AudioContext, at: number, freq: number, gain: number, dur: number): void {
-  const osc = ac.createOscillator();
-  osc.type = 'triangle';
-  osc.frequency.value = freq;
-  const g = ac.createGain();
-  g.gain.setValueAtTime(0, at);
-  g.gain.linearRampToValueAtTime(gain, at + 0.01);
-  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-  osc.connect(g).connect(ac.destination);
-  osc.start(at);
-  osc.stop(at + dur + 0.02);
+/** Decode every effect ahead of time so the first move is not silent. */
+export function preloadSounds(): void {
+  const ac = audio();
+  if (ac) for (const s of SOUNDS) void buffer(ac, `sounds/${s}.wav`);
 }
 
-export function play(name: SoundName): void {
+export function play(name: SoundName, gain = 1): void {
   const ac = audio();
   if (!ac) return;
-  const t = ac.currentTime + 0.005;
-  switch (name) {
-    case 'move':
-      click(ac, t, 1800, 0.55, 0.05);
-      break;
-    case 'capture':
-      click(ac, t, 1100, 0.7, 0.07);
-      click(ac, t + 0.045, 900, 0.5, 0.06);
-      break;
-    case 'check':
-      click(ac, t, 1800, 0.5, 0.05);
-      tone(ac, t + 0.02, 880, 0.06, 0.18);
-      break;
-    case 'low-time':
-      click(ac, t, 3200, 0.25, 0.025);
-      break;
-    case 'end':
-      tone(ac, t, 523.25, 0.07, 0.6);
-      tone(ac, t + 0.09, 659.25, 0.06, 0.6);
-      break;
-  }
+  void buffer(ac, `sounds/${name}.wav`).then((b) => {
+    if (!b) return;
+    const src = ac.createBufferSource();
+    src.buffer = b;
+    const g = ac.createGain();
+    g.gain.value = gain;
+    src.connect(g).connect(ac.destination);
+    src.start();
+  });
 }
 
 /** Which sound a move makes, from its SAN. */
 export function soundForSan(san: string): SoundName {
-  if (san.includes('#')) return 'check';
-  if (san.includes('+')) return 'check';
+  if (san.includes('+') || san.includes('#')) return 'check';
+  if (san.includes('=')) return 'promote';
+  if (san.startsWith('O-O')) return 'castle';
   if (san.includes('x')) return 'capture';
   return 'move';
 }
+
+// ------------------------------------------------------------------ music
+
+/** Quiet, warm and well apart: the tracks play in turn with silence between them. */
+const MUSIC_LEVEL = 0.22;
+const FADE_S = 2.5;
+const GAP_S: [number, number] = [6, 16];
+
+class Music {
+  private on = false;
+  private bus: GainNode | null = null;
+  private current: AudioBufferSourceNode | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private turn = 0;
+
+  get playing(): boolean {
+    return this.on;
+  }
+
+  /** Start (or, after a gesture, resume) the music. */
+  start(): void {
+    const ac = audio();
+    if (!ac || this.on) return;
+    this.on = true;
+    if (!this.bus) {
+      // A gentle low-pass keeps the music behind everything else.
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 3200;
+      this.bus = ac.createGain();
+      this.bus.connect(lp).connect(ac.destination);
+    }
+    this.bus.gain.cancelScheduledValues(ac.currentTime);
+    this.bus.gain.setValueAtTime(this.bus.gain.value, ac.currentTime);
+    this.bus.gain.linearRampToValueAtTime(MUSIC_LEVEL, ac.currentTime + FADE_S);
+    if (!this.current) void this.next(0.5);
+  }
+
+  stop(): void {
+    if (!this.on) return;
+    this.on = false;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    const ac = ctx;
+    const src = this.current;
+    this.current = null;
+    if (!ac || !this.bus) return;
+    this.bus.gain.cancelScheduledValues(ac.currentTime);
+    this.bus.gain.setValueAtTime(this.bus.gain.value, ac.currentTime);
+    this.bus.gain.linearRampToValueAtTime(0, ac.currentTime + 0.6);
+    src?.stop(ac.currentTime + 0.7);
+  }
+
+  private async next(delay: number): Promise<void> {
+    const ac = audio();
+    if (!ac || !this.on || !this.bus) return;
+    const name = MUSIC[this.turn++ % MUSIC.length]!;
+    const b = await buffer(ac, `music/${name}.mp3`);
+    if (!b || !this.on) return;
+    const src = ac.createBufferSource();
+    src.buffer = b;
+    const g = ac.createGain();
+    const t0 = ac.currentTime + delay;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(1, t0 + FADE_S);
+    g.gain.setValueAtTime(1, t0 + b.duration - FADE_S);
+    g.gain.linearRampToValueAtTime(0, t0 + b.duration);
+    src.connect(g).connect(this.bus);
+    src.start(t0);
+    this.current = src;
+    src.onended = () => {
+      if (this.current !== src) return;
+      this.current = null;
+      const gap = GAP_S[0] + Math.random() * (GAP_S[1] - GAP_S[0]);
+      this.timer = setTimeout(() => void this.next(0), gap * 1000);
+    };
+  }
+}
+
+export const music = new Music();

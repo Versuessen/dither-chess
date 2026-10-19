@@ -19,6 +19,7 @@
   import { settings } from './app/settings.svelte';
   import { boot } from './app/boot.svelte';
   import { personaById } from './bots/personas';
+  import { music, play as playSound, type SoundName } from './game/sounds';
 
   let booting = $state(true);
 
@@ -52,6 +53,32 @@
     untrack(() => ui.inksVersion++);
   });
 
+  // Optional background music; the audio context starts on the first gesture.
+  $effect(() => {
+    if (settings.value.music) music.start();
+    else music.stop();
+  });
+
+  /**
+   * Quiet interface sounds for buttons, links and toggles (data-sound picks "confirm", "back" or
+   * "none"; the default is "select"). The board makes its own sounds.
+   */
+  function onClick(e: MouseEvent) {
+    if (!settings.value.sounds) return;
+    const target = e.target as Element | null;
+    // A click on a label also clicks its input: sound once.
+    if (!target || target.tagName === 'INPUT') return;
+    const el = target.closest('button, a[href], label, [role="button"]');
+    if (!el || el.closest('cg-container, .board-wrap') || el.matches(':disabled, [aria-disabled="true"]')) return;
+    const name = el.getAttribute('data-sound') ?? 'select';
+    if (name !== 'none') playSound(name as SoundName, 0.8);
+  }
+
+  function onPointerDown() {
+    // Browsers keep audio suspended until a gesture; music switched on earlier starts now.
+    if (settings.value.music) music.start();
+  }
+
   function onKeydown(e: KeyboardEvent) {
     const target = e.target as HTMLElement | null;
     if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
@@ -60,7 +87,7 @@
   }
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} onclickcapture={onClick} onpointerdown={onPointerDown} />
 
 <DitherLayer />
 

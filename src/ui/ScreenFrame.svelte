@@ -36,7 +36,7 @@
   <main class="panel" class:wide aria-labelledby="screen-title">
     <header class="head">
       <h1 id="screen-title">{title}</h1>
-      <a class="close" href={href({ name: 'home' })}>Close</a>
+      <a class="close" data-sound="back" href={href({ name: 'home' })}>Close</a>
     </header>
     <hr />
     <div class="body">

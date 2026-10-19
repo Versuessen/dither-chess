@@ -60,6 +60,27 @@ Maia-2 (rapid)                   MIT                         University of Toron
   Human-AI Alignment in Chess." NeurIPS 2024.
 
 ------------------------------------------------------------------------------------------
+Sounds and music (public/sounds, public/music), all CC0 1.0 (public domain dedication)
+------------------------------------------------------------------------------------------
+Material Sound Effects           CC0 1.0                     Polar_34
+  https://polar-34.itch.io/material-sound-effects   wood.wav and stone1.wav: the board
+  sounds (move, capture, castle, check, promote, low time) are knocks cut from them.
+Interface SFX Pack 1             CC0 1.0                     ObsydianX
+  https://obsydianx.itch.io/interface-sfx-pack-1    cursor, confirm, back and error tones
+  (style 2, 4 and 5): interface sounds, game start and end, check and promotion accents.
+CoMiGo's Short Music Loops       CC0 1.0                     Cosmo Myzrail Gorynych
+  https://comigo.itch.io/music-loops                "The Divine Elf" and "Suspended",
+  unchanged: the optional background music.
+  tools/sounds/make.py cuts, mixes and normalises the effects from the downloaded packs.
+  None of these licences require credit; it is given here with thanks.
+
+------------------------------------------------------------------------------------------
+Data (bundled)
+------------------------------------------------------------------------------------------
+Lichess opening tables           CC0 1.0                     lichess.org contributors
+  https://github.com/lichess-org/chess-openings (vendor/chess-openings): opening names.
+
+------------------------------------------------------------------------------------------
 Data and tools (not bundled)
 ------------------------------------------------------------------------------------------
 Lichess open database            CC0                         https://database.lichess.org/

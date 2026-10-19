@@ -8,7 +8,7 @@
   import PromotionPicker from '../game/PromotionPicker.svelte';
   import LabelValue from '../ui/LabelValue.svelte';
   import { GameController } from '../game/controller.svelte';
-  import { play as playSound, soundForSan } from '../game/sounds';
+  import { play as playSound, preloadSounds, soundForSan } from '../game/sounds';
   import { settings } from '../app/settings.svelte';
   import { ui } from '../app/ui.svelte';
   import { router, href } from '../app/router.svelte';
@@ -53,6 +53,7 @@
   );
 
   onMount(() => {
+    if (settings.value.sounds) preloadSounds();
     let disposed = false;
     let raf = 0;
     let lastLowTick = -1;
@@ -88,6 +89,7 @@
       });
       c.onBotMoved = () => board?.playPremove();
       controller = c;
+      if (settings.value.sounds) playSound('start');
       c.start();
       const loop = () => {
         c.tick();
@@ -168,14 +170,19 @@
       }
       return;
     }
-    if (!c.humanMove(orig + dest)) board?.reset();
+    if (!c.humanMove(orig + dest)) rejected();
+  }
+
+  function rejected() {
+    board?.reset();
+    if (settings.value.sounds) playSound('illegal', 0.7);
   }
 
   function pick(piece: 'q' | 'r' | 'b' | 'n') {
     if (!promotion || !controller) return;
     const p = promotion;
     promotion = null;
-    if (!controller.humanMove(p.from + p.to + piece)) board?.reset();
+    if (!controller.humanMove(p.from + p.to + piece)) rejected();
   }
 
   function cancelPromotion() {
@@ -198,6 +205,7 @@
     const uci = parseTypedMove(c.fen, text);
     if (!uci || !c.humanMove(uci)) {
       typedError = `${text} is not a legal move here.`;
+      if (settings.value.sounds) playSound('illegal', 0.7);
       return;
     }
     typed = '';
@@ -330,7 +338,7 @@
   <main class="panel" aria-label="Game">
     <header class="head">
       <span>Game · {persona?.name ?? ''}</span>
-      <button class="close" onclick={leave}>{controller?.outcome ? 'Close' : 'Leave'}</button>
+      <button class="close" data-sound="back" onclick={leave}>{controller?.outcome ? 'Close' : 'Leave'}</button>
     </header>
     <hr />
 
