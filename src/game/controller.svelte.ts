@@ -2,6 +2,7 @@
  * Runs one game against a bot: the rules model, the clocks, the bot's human-like timing and
  * decisions, and persistence. The game screen renders this state and forwards user actions.
  */
+import { applyPremoves, premoveDests, premovePromotes, type Premove } from '../chess/premove';
 import type { Square } from 'chess.js';
 import { Game, type Claim, type MoveRecord } from '../chess/game';
 import { insufficientMaterial, describeTermination, type Color, type Outcome } from '../chess/rules';
@@ -61,6 +62,8 @@ export class GameController {
   clockRunning = $state<Color | null>(null);
   rated = $state(false);
   canAbort = $state(true);
+  /** Moves the player queued while the bot was thinking, oldest first (chess/premove.ts). */
+  premoves = $state<Premove[]>([]);
   /** Forward-pass time of the bot's last move, ms (shown as a diagnostic). */
   lastInferenceMs = $state<number | null>(null);
 
@@ -121,7 +124,42 @@ export class GameController {
     return this.humanToMove ? this.game.dests() : new Map();
   }
 
-  /** Destinations for premoves are any pseudo-squares; chessground computes them itself. */
+  /** The position shown while premoves are queued: the real one with the queue applied. */
+  get shownFen(): string {
+    return applyPremoves(this.fen, this.humanColor, this.premoves);
+  }
+
+  /** Where the player may premove from the shown position (empty when it is their turn). */
+  premoveDests(): Map<Square, Square[]> {
+    return this.outcome || this.humanToMove ? new Map() : premoveDests(this.shownFen, this.humanColor);
+  }
+
+  /** Queue a move to play after the bot's reply. Returns false if it is not a premove now. */
+  queuePremove(from: Square, to: Square): boolean {
+    if (this.outcome || this.humanToMove) return false;
+    if (!premoveDests(this.shownFen, this.humanColor).get(from)?.includes(to)) return false;
+    this.premoves = [...this.premoves, { from, to, ...(premovePromotes(this.shownFen, from, to) ? { promotion: 'q' as const } : {}) }];
+    return true;
+  }
+
+  clearPremoves(): void {
+    this.premoves = [];
+  }
+
+  /** After the bot's move: play the first queued premove if it is legal now, else drop them all. */
+  private playQueuedPremove(): void {
+    const [next, ...rest] = this.premoves;
+    if (!next || !this.humanToMove) return;
+    const uci = next.from + next.to + (next.promotion ?? '');
+    const legal = this.game.dests().get(next.from)?.includes(next.to);
+    if (!legal) {
+      this.premoves = [];
+      return;
+    }
+    this.premoves = rest;
+    if (!this.humanMove(uci)) this.premoves = [];
+  }
+
   needsPromotion(from: Square, to: Square): boolean {
     return this.game.isPromotion(from, to);
   }
@@ -215,6 +253,7 @@ export class GameController {
   }
 
   private cancelBot(): void {
+    this.premoves = [];
     this.botToken++;
     if (this.pending !== null) (this.opts.clearTimeout ?? clearTimeout)(this.pending as ReturnType<typeof setTimeout>);
     this.pending = null;
@@ -300,7 +339,10 @@ export class GameController {
       }
       this.sync();
       void this.persist();
-      if (this.game.over) void this.end();
+      if (this.game.over) {
+        this.premoves = [];
+        void this.end();
+      } else this.playQueuedPremove();
       this.onBotMoved?.();
     };
     if (delay <= 0) playIt();
@@ -318,7 +360,7 @@ export class GameController {
     fn();
   }
 
-  /** Hook for the board: play a queued premove right after the bot's move. */
+  /** Called after each bot move (and any premove it triggered). */
   onBotMoved: (() => void) | null = null;
 
   // ------------------------------------------------------------------ state & persistence

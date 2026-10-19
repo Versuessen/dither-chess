@@ -11,7 +11,6 @@
   import type { Key, Color as CgColor, Dests } from 'chessground/types';
   import type { PieceSet } from '../app/settings.svelte';
   import type { BoardPalette } from '../app/colours';
-  import { premoveDests } from '../chess/premove';
 
   interface Props {
     fen: string;
@@ -24,13 +23,17 @@
     check: boolean;
     coordinates: boolean;
     showDests: boolean;
-    premoves: boolean;
     palette: BoardPalette;
     pieceSet: PieceSet;
     animate: boolean;
     /** No moves or premoves (review, game over). Marking squares and drawing arrows still work. */
     viewOnly?: boolean;
     label: string;
+    /** Queued premoves, highlighted in the premove colour; right-click cancels them (oncancelqueue). */
+    queued?: [Key, Key][];
+    oncancelqueue?: () => void;
+    /** The destinations offered are premoves (dots in the premove colour). */
+    premoving?: boolean;
     /** Arrows set by the app (the engine's best move in a review), drawn under the player's own. */
     hints?: { from: Key; to: Key }[];
     onmove: (orig: Key, dest: Key) => void;
@@ -44,9 +47,6 @@
   // chessground only binds its input events if `viewOnly` is false when it is created, so the
   // read-only state is expressed through `movable`/`premovable` instead of `viewOnly`.
   const movableColor = () => (props.viewOnly ? undefined : props.movableColor);
-  const premoves = () => props.premoves && !props.viewOnly;
-  /** Premove squares never include the mover's own pieces (src/chess/premove.ts). */
-  const premoveSquares = () => (props.movableColor ? (premoveDests(props.fen, props.movableColor) as Dests) : new Map());
 
   // Right-click annotations, as on chess.com: a click marks a square red, a drag draws an arrow
   // (knight moves bend round the corner), a left click clears them all.
@@ -66,7 +66,12 @@
   }
 
   function onPointerDown(e: PointerEvent) {
-    if (e.button === 2) {
+    if (e.button === 2 && props.queued?.length && props.oncancelqueue) {
+      // As on the big sites, a right-click first cancels the queued premoves.
+      props.oncancelqueue();
+      dragFrom = null;
+      e.preventDefault();
+    } else if (e.button === 2) {
       dragFrom = squareAt(e.clientX, e.clientY);
       e.preventDefault();
     } else if (e.button === 0 && (marks.length || arrows.length)) {
@@ -132,7 +137,12 @@
     return { line: pts.map((p) => p.join(',')).join(' '), head: headPts.map((p) => p.join(',')).join(' ') };
   }
 
-  const highlights = $derived(new Map(marks.map((k) => [k, 'marked'] as const)));
+  const highlights = $derived(
+    new Map<Key, string>([
+      ...(props.queued ?? []).flatMap(([a, b]) => [[a, 'current-premove'] as const, [b, 'current-premove'] as const]),
+      ...marks.map((k) => [k, 'marked'] as const)
+    ])
+  );
 
   onMount(() => {
     api = Chessground(el, {
@@ -155,7 +165,8 @@
         showDests: props.showDests,
         events: { after: (orig, dest) => props.onmove(orig, dest) }
       },
-      premovable: { enabled: premoves(), showDests: props.showDests, castle: true, customDests: premoveSquares() },
+      // Premoves are queued by the game screen (chess/premove.ts), several at a time.
+      premovable: { enabled: false },
       draggable: { enabled: true, showGhost: true },
       selectable: { enabled: true },
       // Annotations are drawn by this component (marks as squares, bent knight arrows).
@@ -179,23 +190,12 @@
       coordinates: props.coordinates,
       animation: { enabled: props.animate, duration: 160 },
       movable: { color: movableColor(), dests: props.dests, showDests: props.showDests },
-      premovable: { enabled: premoves(), showDests: props.showDests, customDests: premoveSquares() },
       highlight: { lastMove: true, check: true, custom: highlights }
     };
     if (!api) return;
-    if (!config.premovable.enabled) api.cancelPremove();
     if (!config.movable.color) api.selectSquare(null);
     api.set(config);
   });
-
-  /** Play a queued premove, if any. Returns whether one was played. */
-  export function playPremove(): boolean {
-    return api?.playPremove() ?? false;
-  }
-
-  export function cancelPremove(): void {
-    api?.cancelPremove();
-  }
 
   /** Put the pieces back to `fen` (after a cancelled promotion). */
   export function reset(): void {
@@ -216,6 +216,7 @@
 
 <div
   class="board"
+  class:premoving={props.premoving}
   role="application"
   aria-label={props.label}
   {style}
@@ -282,8 +283,13 @@
     border-radius: 50%;
     background: color-mix(in srgb, #111 30%, transparent);
   }
-  .cg :global(cg-board square.premove-dest::after) {
+  .cg :global(cg-board square.premove-dest::after),
+  .premoving .cg :global(cg-board square.move-dest::after) {
     background: color-mix(in srgb, var(--hl-premove) 55%, transparent);
+  }
+  .premoving .cg :global(cg-board square.move-dest.oc::after) {
+    background: transparent;
+    border-color: color-mix(in srgb, var(--hl-premove) 55%, transparent);
   }
   .cg :global(cg-board square.move-dest.oc::after),
   .cg :global(cg-board square.premove-dest.oc::after) {

@@ -196,4 +196,47 @@ describe('GameController', () => {
     expect(c.outcome?.termination).toBe('timeout');
     expect(c.outcome?.winner).toBe('b');
   });
+
+  it('queues several premoves and plays them after each bot move', async () => {
+    const { c, advance } = make(['e7e5', 'b8c6', 'd7d6', 'c6d4']);
+    c.start();
+    expect(c.humanMove('e2e4')).toBe(true);
+    // The bot is thinking: queue Nf3, then Bc4 from where the knight already stands.
+    expect(c.queuePremove('g1', 'f3')).toBe(true);
+    expect(c.queuePremove('f1', 'c4')).toBe(true);
+    expect(c.queuePremove('f1', 'b5')).toBe(false); // the bishop is already queued to c4
+    expect(c.shownFen.split(' ')[0]).toBe('rnbqkbnr/pppppppp/8/8/2B1P3/5N2/PPPP1PPP/RNBQK2R');
+    await tick();
+    await advance(60_000);
+    // ...e5, then Nf3 at once; then ...Nc6 and Bc4.
+    expect(c.moves.map((m) => m.san)).toEqual(['e4', 'e5', 'Nf3']);
+    expect(c.premoves).toHaveLength(1);
+    await tick();
+    await advance(60_000);
+    expect(c.moves.map((m) => m.san)).toEqual(['e4', 'e5', 'Nf3', 'Nc6', 'Bc4']);
+    expect(c.premoves).toHaveLength(0);
+    await tick();
+    await advance(60_000);
+    expect(c.humanMove('e1g1')).toBe(true);
+    // Premoving the bishop to f7 with check, then queue more, then cancel them all.
+    expect(c.queuePremove('c4', 'f7')).toBe(true);
+    expect(c.queuePremove('f3', 'e5')).toBe(true);
+    c.clearPremoves();
+    expect(c.premoves).toHaveLength(0);
+    expect(c.shownFen).toBe(c.fen);
+  });
+
+  it('drops the whole queue when the next premove is illegal after the bot moves', async () => {
+    // The queued e4-e5 is blocked once the bot answers ...e5.
+    const { c, advance } = make(['e7e5']);
+    c.start();
+    expect(c.humanMove('e2e4')).toBe(true);
+    expect(c.queuePremove('e4', 'e5')).toBe(true);
+    expect(c.queuePremove('d2', 'd4')).toBe(true);
+    await tick();
+    await advance(60_000);
+    expect(c.moves.map((m) => m.san)).toEqual(['e4', 'e5']);
+    expect(c.premoves).toHaveLength(0);
+    expect(c.humanToMove).toBe(true);
+  });
 });

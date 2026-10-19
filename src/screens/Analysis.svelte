@@ -161,7 +161,6 @@
             check={false}
             coordinates={settings.value.coordinates}
             showDests={false}
-            premoves={false}
             palette={boardPalette(settings.value.colours)}
             pieceSet={settings.value.pieceSet}
             animate={!ui.reducedMotion}
@@ -317,6 +316,7 @@
     color: var(--eval-white);
   }
   .side {
+    min-width: 0;
     display: grid;
     gap: 14px;
     align-content: start;

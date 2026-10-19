@@ -87,7 +87,6 @@
           await onfinished?.(g);
         }
       });
-      c.onBotMoved = () => board?.playPremove();
       controller = c;
       if (settings.value.sounds) playSound('start');
       c.start();
@@ -140,7 +139,7 @@
   const shownFen = $derived.by(() => {
     const c = controller;
     if (!c) return 'start';
-    if (viewing === null) return c.fen;
+    if (viewing === null) return c.shownFen;
     return viewing === 0 ? c.game.startFen : c.moves[viewing - 1]!.fen;
   });
   const shownLastMove = $derived.by((): [Key, Key] | undefined => {
@@ -151,7 +150,11 @@
     return m ? [m.uci.slice(0, 2) as Key, m.uci.slice(2, 4) as Key] : undefined;
   });
   const humanCg = $derived(controller?.humanColor === 'b' ? 'black' : 'white');
-  const dests = $derived(controller && live && controller.humanToMove ? controller.legalDests() : new Map());
+  /** While the bot thinks, the player may queue premoves (several, shown on the board). */
+  const premoving = $derived(!!controller && live && !controller.outcome && !controller.humanToMove && settings.value.premoves);
+  const dests = $derived(
+    !controller || !live ? new Map() : controller.humanToMove ? controller.legalDests() : premoving ? controller.premoveDests() : new Map()
+  );
   const initialClock = $derived(
     setup.timeControl.base === 0 && setup.timeControl.increment === 0 ? Infinity : setup.timeControl.base * 1000
   );
@@ -162,6 +165,10 @@
   function onmove(orig: Key, dest: Key) {
     const c = controller;
     if (!c) return;
+    if (!c.humanToMove) {
+      if (!c.queuePremove(orig as never, dest as never)) board?.reset();
+      return;
+    }
     if (c.needsPromotion(orig as never, dest as never)) {
       if (settings.value.autoQueen || !c.humanToMove) {
         c.humanMove(orig + dest + 'q');
@@ -358,14 +365,16 @@
               bind:this={board}
               fen={shownFen}
               {orientation}
-              turnColor={controller?.turn === 'b' ? 'black' : 'white'}
+              turnColor={premoving ? humanCg : controller?.turn === 'b' ? 'black' : 'white'}
               movableColor={controller && live && !controller.outcome ? humanCg : undefined}
               {dests}
               lastMove={shownLastMove}
               check={live && (controller?.check ?? false)}
               coordinates={settings.value.coordinates}
               showDests={settings.value.showDests}
-              premoves={settings.value.premoves && live}
+              {premoving}
+              queued={controller?.premoves.map((p) => [p.from, p.to] as [Key, Key]) ?? []}
+              oncancelqueue={() => controller?.clearPremoves()}
               palette={boardPalette(settings.value.colours)}
               pieceSet={settings.value.pieceSet}
               animate={!ui.reducedMotion}
@@ -402,8 +411,13 @@
           <p class="sr-only" aria-live="polite" aria-atomic="true">{announcement}</p>
 
           <div class="moves">
-            <p class="opening" data-testid="opening" title={opening ? `ECO ${opening.eco}` : undefined}>
-              {#if opening}<span class="eco">{opening.eco}</span> {opening.name}{:else}&nbsp;{/if}
+            <!-- Opening on one line, variation under it; each shortened with an ellipsis, the full name on hover. -->
+            <p class="opening" data-testid="opening" title={opening ? `${opening.eco} ${opening.name}` : undefined}>
+              {#if opening}
+                {@const [fam, ...rest] = opening.name.split(': ')}
+                <span class="line"><span class="eco">{opening.eco}</span> {fam}</span>
+                <span class="line variation">{rest.join(': ') || ' '}</span>
+              {:else}<span class="line">&nbsp;</span><span class="line variation">&nbsp;</span>{/if}
             </p>
             {#if controller}
               <MoveList moves={controller.moves} viewing={viewing ?? controller.moves.length} onselect={(p) => (viewing = p === controller!.moves.length ? null : p)} />
@@ -565,6 +579,8 @@
     width: var(--board);
   }
   .side {
+    /* Without this a long opening name widens the column past the frame. */
+    min-width: 0;
     display: grid;
     grid-template-rows: auto auto auto minmax(0, 1fr) auto auto auto auto;
     gap: 8px;
@@ -617,14 +633,20 @@
     padding: 6px 0;
   }
   .opening {
+    display: grid;
     margin: 0 0 6px;
-    min-height: 1.3em;
     font-size: var(--ui-size-small);
     text-transform: none;
     letter-spacing: 0.03em;
+  }
+  .opening .line {
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .opening .variation {
+    color: var(--panel-muted);
   }
   .eco {
     color: var(--panel-muted);
