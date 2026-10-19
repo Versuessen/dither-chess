@@ -41,15 +41,30 @@ $exe = Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA 'DITHER'), $installRoot 
 if (-not $exe) { throw 'NSIS: dither.exe not found under the user profile' }
 Run-Smoke $exe.FullName
 $uninstaller = Get-ChildItem -Path $exe.DirectoryName -Filter 'uninstall*.exe' | Select-Object -First 1
-if ($uninstaller) { Start-Process -FilePath $uninstaller.FullName -ArgumentList '/S' -Wait }
+if (-not $uninstaller) { throw 'NSIS: no uninstaller next to dither.exe' }
+Start-Process -FilePath $uninstaller.FullName -ArgumentList '/S' -Wait
+# An NSIS uninstaller reruns itself from a temporary copy and returns at once: wait until the files
+# are gone, so the MSI check below cannot find this install's dither.exe instead of its own.
+$deadline = (Get-Date).AddSeconds(120)
+while ((Test-Path $exe.FullName) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+if (Test-Path $exe.FullName) { throw 'NSIS: the uninstaller left dither.exe behind' }
 
-# MSI, per user: must not need elevation
+# MSI, per user: it has to land in the user's profile, never under Program Files. The folder is
+# %LOCALAPPDATA%\Programs\DITHER on a fresh machine; Tauri's MSI reuses the folder of an earlier
+# install it finds in HKCU (the NSIS one above), which is also in the profile.
 $msi = Get-ChildItem (Join-Path $bundle 'msi\*.msi') | Select-Object -First 1
 $log = Join-Path $env:RUNNER_TEMP 'msi.log'
 $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$($msi.FullName)`"", '/qn', '/l*v', "`"$log`"" -Wait -PassThru
 if ($p.ExitCode -ne 0) { Get-Content $log -Tail 80; throw "msiexec /i failed with $($p.ExitCode)" }
-$exe = Get-ChildItem -Path $installRoot -Recurse -Filter 'dither.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $exe) { Get-Content $log -Tail 80; throw 'MSI: dither.exe not under %LOCALAPPDATA%\Programs (not a per-user install)' }
+foreach ($pf in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+  if ($pf -and (Test-Path (Join-Path $pf 'DITHER'))) { throw "MSI: installed under $pf (not a per-user install)" }
+}
+$exe = Get-ChildItem -Path $env:LOCALAPPDATA -Recurse -Depth 3 -Filter 'dither.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $exe) {
+  Select-String -Path $log -Pattern 'INSTALLDIR|ProgramFiles64Folder' | Select-Object -Last 20 | ForEach-Object { $_.Line }
+  throw 'MSI: dither.exe not found under %LOCALAPPDATA% (not a per-user install)'
+}
+Write-Host "MSI installed per user to $($exe.DirectoryName)"
 Run-Smoke $exe.FullName
 $p = Start-Process msiexec.exe -ArgumentList '/x', "`"$($msi.FullName)`"", '/qn' -Wait -PassThru
 if ($p.ExitCode -ne 0) { throw "msiexec /x failed with $($p.ExitCode)" }

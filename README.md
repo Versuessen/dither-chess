@@ -33,7 +33,8 @@ Download either installer from the release page; both install for the current us
 administrator rights:
 
 - `DITHER_<version>_x64-setup.exe` (NSIS)
-- `DITHER_<version>_x64_en-US.msi` (Windows Installer, installs to `%LOCALAPPDATA%\Programs\DITHER`)
+- `DITHER_<version>_x64_en-US.msi` (Windows Installer, installs to `%LOCALAPPDATA%\Programs\DITHER`,
+  or into the folder of an earlier DITHER install)
 
 The installers carry the WebView2 runtime (offline installer), so they work without a connection.
 The *offline* builds also carry every model pack.
