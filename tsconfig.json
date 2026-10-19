@@ -19,5 +19,5 @@
     "skipLibCheck": true,
     "types": ["vite/client", "node"]
   },
-  "include": ["src/**/*.ts", "src/**/*.svelte", "tests/**/*.ts", "tools/art/**/*.ts", "tools/vite/**/*.ts", "vite.config.ts", "playwright.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.svelte", "tests/**/*.ts", "tools/art/**/*.ts", "tools/vite/**/*.ts", "tools/packs/**/*.ts", "tools/serve-static.ts", "vite.config.ts", "playwright.config.ts", "playwright.pages.config.ts"]
 }

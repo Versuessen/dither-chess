@@ -1,0 +1,72 @@
+# The web app on GitHub Pages: https://<owner>.github.io/<repository>/
+#
+# Builds the web app for the repository's sub-path with the model packs that models/manifest.json
+# pins (fetched from the `models-v<version>` release, SHA-256 checked), tests that exact build
+# the way Pages serves it (sub-path, no COOP/COEP: isolation comes from the service worker),
+# and deploys it. Pages must be set to "GitHub Actions" as its source (Settings → Pages).
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DITHER_BASE: /${{ github.event.repository.name }}/
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      - name: Model packs from the release
+        run: pnpm models:fetch
+      - name: Build for ${{ env.DITHER_BASE }}
+        run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Test the build as Pages serves it
+        run: pnpm test:pages
+        env:
+          CI: '1'
+          DITHER_PAGES_DIR: dist
+          DITHER_PAGES_BASE: ${{ env.DITHER_BASE }}
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report-pages
+          path: playwright-report-pages/
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

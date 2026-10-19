@@ -1,11 +1,13 @@
 node_modules/
 dist/
+dist-pages/
 dist-ssr/
 *.local
 .DS_Store
 coverage/
 test-results/
 playwright-report/
+playwright-report-pages/
 blob-report/
 
 # Tauri
@@ -22,3 +24,6 @@ tools/calibrate/work/
 
 # Model packs are release assets, not source
 models/packs/
+
+# Local signing output (sign-rpm.sh); the published key lives on the release page
+packaging/linux/out/

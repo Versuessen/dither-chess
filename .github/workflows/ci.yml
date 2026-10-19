@@ -23,9 +23,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -34,33 +34,36 @@ jobs:
       - run: pnpm test
 
   models:
-    # Converts, verifies (parity on 2,016 positions) and packs the models from pinned sources.
+    # Converts, verifies (parity on 2,016 positions) and packs the models from pinned sources: a
+    # check that the pipeline still reproduces them. The other jobs, and the web app on Pages, use
+    # the packs published in the `models-v<version>` release, which models/manifest.json pins by
+    # SHA-256 (a rebuilt pack embeds this run's parity report, so its checksum differs).
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
       GITHUB_REPOSITORY: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - uses: actions/cache@v4
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/cache@v6
         with:
           path: tools/models/work
           key: models-work-${{ hashFiles('tools/models/sources.lock.json', 'tools/models/src/**', 'tools/models/uv.lock') }}
       - run: uv run dither-models all
         working-directory: tools/models
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: model-packs
           path: |
             models/manifest.json
             models/packs/*.dpk
           retention-days: 14
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: model-reports
           path: tools/models/reports/
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -71,45 +74,37 @@ jobs:
           DITHER_REQUIRE_MODELS: '1'
 
   e2e:
-    needs: models
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: model-packs
-          path: models
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Model packs from the release (SHA-256 checked against models/manifest.json)
+        run: pnpm models:fetch
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
         env:
           CI: '1'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
           path: playwright-report/
 
   windows:
-    needs: models
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
         variant: [standard, offline]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: model-packs
-          path: models
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -118,6 +113,8 @@ jobs:
         with:
           workspaces: src-tauri
       - run: pnpm install --frozen-lockfile
+      - name: Model packs from the release (SHA-256 checked against models/manifest.json)
+        run: pnpm models:fetch
       - name: Build NSIS and MSI installers
         shell: pwsh
         run: |
@@ -126,7 +123,7 @@ jobs:
       - name: Smoke-test the per-user installers
         shell: pwsh
         run: ./packaging/windows/smoke.ps1 -Variant ${{ matrix.variant }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-${{ matrix.variant }}
           path: |
@@ -134,7 +131,6 @@ jobs:
             src-tauri/target/release/bundle/msi/*.msi
 
   fedora:
-    needs: models
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -150,12 +146,10 @@ jobs:
             webkit2gtk4.1-devel gtk3-devel libsoup3-devel openssl-devel librsvg2-devel libappindicator-gtk3-devel \
             file wget xorg-x11-server-Xvfb xorg-x11-xauth mesa-dri-drivers dbus-x11 fuse-libs
           npm install -g corepack && corepack enable
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: model-packs
-          path: models
+      - uses: actions/checkout@v6
       - run: pnpm install --frozen-lockfile
+      - name: Model packs from the release (SHA-256 checked against models/manifest.json)
+        run: pnpm models:fetch
       - name: Build RPM and AppImage
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
@@ -170,7 +164,7 @@ jobs:
         run: packaging/linux/sign-rpm.sh src-tauri/target/release/bundle/rpm/*.rpm
       - name: Install with signature checking and smoke-test
         run: packaging/linux/smoke.sh ${{ matrix.variant }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: fedora${{ matrix.fedora }}-${{ matrix.variant }}
           path: |

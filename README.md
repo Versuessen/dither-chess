@@ -22,9 +22,13 @@ Windows 11 and Fedora (KDE), from one codebase.
 
 ### Web
 
-Open the hosted app in a Chromium-based browser, Firefox or Safari, and install it from the address
-bar if you like. Go to **Models**, download a pack (fastelo is 15 MB), and play. After that it works
-without a connection.
+Open **https://versuessen.github.io/dither-chess/** in a Chromium-based browser, Firefox or Safari,
+and install it from the address bar if you like. Go to **Models**, download a pack (fastelo is
+15 MB), and play. After that it works without a connection.
+
+The first visit reloads the page once: GitHub Pages cannot send the headers that unlock
+multi-threaded inference, so the app's service worker adds them and the page reloads to pick them
+up. Without that (or in a browser that refuses), the bots still play, single-threaded.
 
 ### Windows 11
 
@@ -76,14 +80,28 @@ pnpm tauri build --config src-tauri/tauri.offline.conf.json   # full-offline bui
 ```bash
 pnpm test           # unit tests: rules, clocks, PGN, rating, storage, encoders, model parity, packs
 pnpm check          # strict type check
+pnpm models:fetch   # the model packs models/manifest.json pins, from the release (SHA-256 checked)
 pnpm test:e2e       # Playwright on the production build: a full rated game per model, offline session,
                     # WCAG 2.1 AA (axe) and keyboard play, performance budgets, themes, reduced motion
+pnpm test:pages     # the GitHub Pages build: sub-path, no COOP/COEP, service-worker isolation, offline
 ```
 
 The model-parity tests run the exported ONNX models through onnxruntime-web when they are present in
 `tools/models/work/onnx` (`DITHER_REQUIRE_MODELS=1` makes their absence an error). End-to-end tests
-need the model packs in `models/packs` and a Chromium (`pnpm exec playwright install chromium`, or
-point `DITHER_CHROMIUM` at one).
+need the model packs in `models/packs` (`pnpm models:fetch`) and a Chromium
+(`pnpm exec playwright install chromium`, or point `DITHER_CHROMIUM` at one).
+
+### Website (GitHub Pages)
+
+`.github/workflows/pages.yml` publishes the web app on every push to `main`: it builds for the
+repository's sub-path (`DITHER_BASE=/<repository>/`), takes the model packs from the
+`models-v<version>` release, runs the type check, the unit tests and `test:pages` against the very
+files it is about to publish, then deploys them. In the repository settings, Pages' source must be
+**GitHub Actions**. The packs are served from the same site, because the isolated page cannot load
+GitHub's release downloads directly.
+
+New model packs: build them (`pnpm models:all`), upload the `.dpk` files to a release tagged
+`models-v<version>`, and commit the regenerated `models/manifest.json`.
 
 ### Models
 

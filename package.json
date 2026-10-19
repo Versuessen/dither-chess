@@ -17,10 +17,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:pages": "playwright test -c playwright.pages.config.ts",
     "art": "node tools/art/render.ts",
     "fonts": "node tools/fonts/sync.ts",
     "tauri": "tauri",
     "art:pieces": "node tools/art/pieces1bit.ts",
+    "models:fetch": "node tools/packs/fetch.ts",
     "models:pack": "cd tools/models && uv run dither-models pack",
     "models:all": "cd tools/models && uv run dither-models all"
   },

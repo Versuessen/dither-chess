@@ -72,7 +72,12 @@ export class OpfsStore implements ModelStore {
     const d = await dir();
     const partName = `${pack.file}.part`;
     let lastError: unknown = null;
-    for (const url of urls) {
+    // Same-origin mirrors first: a cross-origin source (GitHub release assets) only works where it
+    // sends CORS headers, and the isolated page refuses it otherwise. Order is kept within each group.
+    const here = globalThis.location?.origin;
+    const local = (u: string) => (here ? Number(new URL(u, here).origin === here) : 0);
+    const ordered = [...urls].sort((a, b) => local(b) - local(a));
+    for (const url of ordered) {
       try {
         await this.downloadTo(d, partName, url, pack.size, onProgress, signal);
         lastError = null;

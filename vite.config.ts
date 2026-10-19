@@ -15,7 +15,19 @@ const isolationHeaders = {
   'Cross-Origin-Resource-Policy': 'same-origin'
 };
 
+/**
+ * Where the web build is served from. `/` locally; GitHub Pages serves a project site under
+ * `/<repository>/` (set by .github/workflows/pages.yml). Routing is hash-based, so no server
+ * rewrites are needed below the base.
+ */
+function base(): string {
+  const b = process.env.DITHER_BASE?.trim();
+  if (!b) return '/';
+  return `/${b.replace(/^\/+|\/+$/g, '')}/`.replace(/^\/\/$/, '/');
+}
+
 export default defineConfig({
+  base: base(),
   plugins: [svelte(), modelPacks(fileURLToPath(new URL('.', import.meta.url))), serviceWorker(fileURLToPath(new URL('./src/sw/sw-template.js', import.meta.url)))],
   clearScreen: false,
   server: {
