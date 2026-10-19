@@ -36,10 +36,19 @@ export function classify(tc: TimeControl): TimeClass {
   return 'bullet';
 }
 
-/** Only rapid games can be rated here: the models are calibrated on rapid play. */
-export function isRatable(tc: TimeControl): boolean {
-  return classify(tc) === 'rapid';
+/**
+ * The rating pools: one rating per speed, as FIDE and Lichess keep them. Bullet below blitz,
+ * classical for standard play and for untimed games (no clock, all the time in the world).
+ */
+export type Speed = 'bullet' | 'blitz' | 'rapid' | 'classical';
+export const SPEEDS: readonly Speed[] = ['bullet', 'blitz', 'rapid', 'classical'];
+
+export function speedOf(tc: TimeControl): Speed {
+  const c = classify(tc);
+  return c === 'untimed' || c === 'standard' ? 'classical' : c;
 }
+
+export const SPEED_LABEL: Record<Speed, string> = { bullet: 'Bullet', blitz: 'Blitz', rapid: 'Rapid', classical: 'Classical' };
 
 export function formatTimeControl(tc: TimeControl): string {
   if (isUntimed(tc)) return 'Untimed';
@@ -61,11 +70,13 @@ export function pgnTimeControl(tc: TimeControl): string {
 
 /** The clocks offered when starting a game. */
 export const TIME_CONTROLS: readonly TimeControl[] = [
+  { base: 60, increment: 1 },
+  { base: 180, increment: 2 },
+  { base: 300, increment: 3 },
   { base: 600, increment: 5 },
   { base: 900, increment: 10 },
-  { base: 1500, increment: 10 },
   { base: 1800, increment: 0 },
-  { base: 300, increment: 3 },
+  { base: 3600, increment: 30 },
   UNTIMED
 ];
 

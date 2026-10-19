@@ -7,6 +7,7 @@
  * period ended now.
  */
 import type { LedgerEntry, LedgerGame, RatingSettings } from '../storage/types';
+import type { Speed } from '../chess/timeControl';
 import { DEFAULT_SETTINGS, RULES, expectedScore, gameIsRated, initialRating, kFactor, roundAway } from './fide';
 
 export interface GameRow {
@@ -93,13 +94,33 @@ function settingsAt(entries: readonly LedgerEntry[], period: string): RatingSett
   return s;
 }
 
+/** The rating pool a game row belongs to. */
+export function speedOfEntry(g: LedgerGame): Speed {
+  return g.speed ?? 'rapid';
+}
+
+/** Ids of games the player has taken out of the rating (the latest exclusion row per game wins). */
+export function excludedGames(entries: readonly LedgerEntry[]): Set<string> {
+  const out = new Set<string>();
+  for (const e of [...entries].sort((a, b) => a.seq - b.seq)) {
+    if (e.kind !== 'exclusion') continue;
+    if (e.excluded) out.add(e.gameId);
+    else out.delete(e.gameId);
+  }
+  return out;
+}
+
 /**
- * Replay the whole ledger. `now` and `timeZone` decide which period is current (live); all
- * earlier periods are closed.
+ * Replay the ledger for one rating pool (all game rows when `speed` is omitted). `now` and
+ * `timeZone` decide which period is current (live); all earlier periods are closed. Games the
+ * player excluded are left out as if they had never been rated.
  */
-export function replay(entries: readonly LedgerEntry[], now: Date, timeZone: string): RatingReplay {
+export function replay(entries: readonly LedgerEntry[], now: Date, timeZone: string, speed?: Speed): RatingReplay {
   const sorted = [...entries].sort((a, b) => a.seq - b.seq);
-  const games = sorted.filter((e): e is LedgerGame => e.kind === 'game');
+  const excluded = excludedGames(sorted);
+  const games = sorted.filter(
+    (e): e is LedgerGame => e.kind === 'game' && !excluded.has(e.gameId) && (speed === undefined || speedOfEntry(e) === speed)
+  );
   const currentPeriod = periodOf(now.toISOString(), timeZone);
   const byPeriod = new Map<string, LedgerGame[]>();
   for (const g of games) {

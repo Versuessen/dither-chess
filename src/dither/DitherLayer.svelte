@@ -68,6 +68,7 @@
   $effect(() => {
     // Re-read the inks whenever the theme changes; the tokens are the single source.
     void ui.theme;
+    void ui.inksVersion;
     if (renderer) {
       const r = renderer;
       requestAnimationFrame(() => r.setInks(readInks()));

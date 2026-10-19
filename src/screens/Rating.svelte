@@ -9,6 +9,8 @@
   import { storage } from '../storage';
   import type { StoredGame } from '../storage/types';
   import { href } from '../app/router.svelte';
+  import { SPEEDS, SPEED_LABEL, type Speed } from '../chess/timeControl';
+  import { speedOfEntry } from '../rating/ledger';
 
   let games = $state<StoredGame[]>([]);
   let open = $state<string | null>(null);
@@ -25,7 +27,10 @@
     return () => clearInterval(t);
   });
 
-  const r = $derived(rating.state);
+  // The pool shown first is the one played most recently.
+  const lastGame = rating.ledger.findLast((e) => e.kind === 'game');
+  let speed = $state<Speed>(lastGame?.kind === 'game' ? speedOfEntry(lastGame) : 'rapid');
+  const r = $derived(rating.of(speed));
   const s = $derived(r?.settings);
   $effect(() => {
     if (s) {
@@ -47,7 +52,7 @@
   const unratedNow = $derived(!!r && r.published === null);
   const provisional = $derived(live?.initial ?? null);
   const fideInitial = $derived(
-    r && unratedNow && s && s.hypotheticalOpponent !== 1800 ? rating.preview({ hypotheticalOpponent: 1800 }).periods.at(-1)?.initial ?? null : null
+    r && unratedNow && s && s.hypotheticalOpponent !== 1800 ? rating.preview(speed, { hypotheticalOpponent: 1800 }).periods.at(-1)?.initial ?? null : null
   );
 
   // History graph: the rating at the end of every period, plus the live point.
@@ -114,9 +119,17 @@
 
 <ScreenFrame title="Rating" current="rating" wide>
   {#if r}
+    <div class="speeds">
+      <Toggle
+        legend="Rating pool"
+        value={speed}
+        options={SPEEDS.map((sp) => ({ value: sp, label: `${SPEED_LABEL[sp]} ${ratingLabel(rating.of(sp)).replace(/^Unrated.*/, '—')}` }))}
+        onchange={(v) => (speed = v)}
+      />
+    </div>
     <div class="top">
       <div class="status">
-        <span class="label">Rapid rating · FIDE method · Lichess rapid scale</span>
+        <span class="label">{SPEED_LABEL[speed]} rating · FIDE method · Lichess rapid scale</span>
         <span class="big" data-testid="rating-value">{ratingLabel(r)}</span>
         {#if r.published !== null && r.live !== null && r.live !== r.published}
           <span class="live">Live {r.live} ({fmt(r.live - r.published)} this month)</span>
@@ -134,7 +147,7 @@
 
     {#if unratedNow}
       <p class="note">
-        A rating is published once at least {RULES.initialGames} rated rapid games, played within {RULES.poolMonths} months,
+        A rating is published once at least {RULES.initialGames} rated {SPEED_LABEL[speed].toLowerCase()} games, played within {RULES.poolMonths} months,
         are pooled: the average of your opponents plus two hypothetical opponents rated {s?.hypotheticalOpponent}, counted
         as draws, plus the FIDE table value for your score (FIDE 7.2). It appears on the list at the start of the next month.
         {#if provisional}
@@ -165,7 +178,11 @@
     <section aria-labelledby="ledger-title">
       <h2 id="ledger-title" class="label">Rating periods</h2>
       {#if r.periods.every((p) => p.games.length === 0)}
-        <p class="note">No rated games yet. Rated games use a rapid clock (15+10 by default), allow no takebacks and count once both sides have moved. <a href={href({ name: 'home' })}>Pick an opponent</a>.</p>
+        <p class="note">
+          No rated {SPEED_LABEL[speed].toLowerCase()} games yet. Each speed has its own rating: bullet, blitz, rapid, and classical (which
+          includes untimed games). A game is rated when you choose Rated before it starts, take nothing back and both sides have moved;
+          aborted games never count, and History can take any game out of the rating. <a href={href({ name: 'home' })}>Pick an opponent</a>.
+        </p>
       {:else}
         <table>
           <thead>
@@ -273,6 +290,9 @@
 </ScreenFrame>
 
 <style>
+  .speeds {
+    margin-bottom: 26px;
+  }
   .top {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

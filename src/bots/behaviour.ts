@@ -28,36 +28,50 @@ export interface ThinkInput {
   base: number;
   /** Time inference already took, ms. */
   inferenceMs: number;
+  /** The bot's rating (Lichess rapid scale): weaker players move faster and think less. */
+  level: number;
 }
 
-/** Human-like pause before the move appears, in ms (inference time already subtracted). */
+/** Longest human-like pause at the lowest and the highest levels, ms. */
+export const THINK_CAP = { low: 3000, high: 12_000 } as const;
+
+/**
+ * Human-like pause before the move appears, in ms (inference time already subtracted).
+ *
+ * It follows the clock the way a player budgets time, but DITHER is a training partner, so the
+ * pause is a fraction of a real player's and capped: from 3 s at the lowest levels to 12 s at the
+ * top, with simple and forced moves far quicker. Untimed games pace themselves like 10+5.
+ */
 export function thinkTime(t: ThinkInput, rng: Rng): number {
   const timed = Number.isFinite(t.remaining);
-  // Untimed games pace themselves like 15+10.
-  const remaining = timed ? t.remaining : 900_000;
-  const increment = timed ? t.increment : 10_000;
+  const remaining = timed ? t.remaining : 600_000;
+  const increment = timed ? t.increment : 5_000;
   const moveNo = Math.floor(t.ply / 2) + 1;
   const movesLeft = Math.max(18, 42 - moveNo * 0.6);
   const budget = remaining / movesLeft + increment * 0.75;
+  // 0 at 600, 1 at 2400 and above.
+  const strength = Math.min(1, Math.max(0, (t.level - 600) / 1800));
+  const pace = 0.3 + 0.4 * strength;
+  const cap = THINK_CAP.low + (THINK_CAP.high - THINK_CAP.low) * strength;
 
   // Complexity: normalised entropy of the bot's own move distribution.
   const maxH = Math.log(Math.max(2, t.legal));
   const complexity = Math.min(1, Math.max(0, t.entropy / maxH));
-  let factor = 0.25 + 1.6 * complexity ** 1.3;
+  let factor = 0.12 + 1.6 * complexity ** 1.5;
 
   if (t.chosenProb > 0.92) factor = Math.min(factor, 0.22); // obvious, e.g. a recapture
-  if (moveNo <= 6) factor *= 0.35; // book-like opening moves come fast
-  else if (moveNo <= 12) factor *= 0.7;
+  if (moveNo <= 6) factor *= 0.3; // book-like opening moves come fast
+  else if (moveNo <= 12) factor *= 0.6;
 
   // Humans vary: log-normal noise around the plan (median 1, sigma 0.45).
   const u1 = Math.max(rng.next(), 1e-9);
   const u2 = rng.next();
   const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-  let ms = budget * factor * Math.exp(0.45 * z);
+  let ms = Math.min(cap, budget * factor * pace * Math.exp(0.45 * z));
 
   // A forced move is played almost at once, whatever the clock.
   if (t.legal === 1) ms = 250 + 450 * rng.next();
-  else if (t.chosenProb > 0.92) ms = Math.min(ms, 2500);
+  else if (t.chosenProb > 0.92) ms = Math.min(ms, 1800);
 
   // Never spend the bot's own time unfairly: at most 6% of what is left, keep 2 s spare.
   if (timed) ms = Math.min(ms, remaining * 0.06, Math.max(0, remaining - 2000));

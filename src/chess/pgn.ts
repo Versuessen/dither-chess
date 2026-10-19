@@ -6,7 +6,7 @@ import { Chess } from 'chess.js';
 import { pgnClock } from './clock';
 import type { MoveRecord } from './game';
 import { pgnTermination, type Outcome } from './rules';
-import { pgnTimeControl, type TimeControl } from './timeControl';
+import { pgnTimeControl, speedOf, type TimeControl } from './timeControl';
 
 export const STANDARD_START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -33,7 +33,7 @@ function escape(v: string): string {
 export function toPgn(g: PgnInput): string {
   const d = g.startedAt;
   const tags: [string, string][] = [
-    ['Event', g.rated ? 'DITHER rated rapid game' : 'DITHER casual game'],
+    ['Event', g.rated ? `DITHER rated ${speedOf(g.timeControl)} game` : 'DITHER casual game'],
     ['Site', 'DITHER (offline)'],
     ['Date', `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`],
     ['Round', '-'],

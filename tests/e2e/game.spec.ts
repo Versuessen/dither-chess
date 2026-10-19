@@ -68,12 +68,13 @@ for (const pack of packs) {
     await panel.locator('fieldset', { hasText: 'Model' }).getByText(new RegExp(`^${pack.title.split(' ')[0]}`)).click();
     await panel.locator('fieldset', { hasText: 'Colour' }).getByText('White', { exact: true }).click();
     await panel.locator('fieldset', { hasText: 'Clock' }).getByText('15+10', { exact: true }).click();
-    await expect(panel.getByText('Clock · rated')).toBeVisible();
+    await expect(panel.getByText('Clock · Rapid')).toBeVisible();
+    await panel.locator('fieldset', { hasText: 'Game' }).getByText('Rated', { exact: true }).click();
     await panel.getByRole('button', { name: 'Play' }).click();
 
     const screen = page.locator('.screen-game');
     await expect(screen).toHaveAttribute('data-state', /human|bot/, { timeout: 60_000 });
-    await expect(page.locator('.status')).toContainText('Rated');
+    await expect(page.locator('.status')).toContainText('Rated Rapid');
 
     const rand = seeded(pack.id.length * 7919);
     for (let ply = 0; ply < 600; ply++) {
@@ -117,6 +118,20 @@ for (const pack of packs) {
     const month = page.locator('table tbody tr').first();
     await expect(month).toContainText('live');
     await expect(month.locator('td').nth(1)).toHaveText('1');
+
+    // History can take the game out of the rating, and put it back.
+    await page.goto('/#/history');
+    await page.getByRole('button', { name: 'Details' }).click();
+    await expect(page.getByTestId('dev-pgn')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Remove from rating' }).click();
+    await expect(page.getByText('Removed', { exact: true })).toBeVisible();
+    await page.goto('/#/rating');
+    await expect(page.getByText(/No rated rapid games yet/)).toBeVisible();
+    await page.goto('/#/history');
+    await page.getByRole('button', { name: 'Details' }).click();
+    await page.getByRole('button', { name: 'Count for rating again' }).click();
+    await page.goto('/#/rating');
+    await expect(page.locator('table tbody tr').first().locator('td').nth(1)).toHaveText('1');
   });
 }
 

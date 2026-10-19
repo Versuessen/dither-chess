@@ -10,7 +10,7 @@
   import { manager } from '../models/manager.svelte';
   import { MODELS, modelInfo, nearestLevel, type ModelFamily } from '../models/catalog';
   import { loadPrefs, savePrefs, type ColourChoice } from '../chess/setup';
-  import { TIME_CONTROLS, classify, formatTimeControl, isRatable, type TimeControl } from '../chess/timeControl';
+  import { TIME_CONTROLS, SPEED_LABEL, formatTimeControl, speedOf, type TimeControl } from '../chess/timeControl';
   import DitherTile from '../dither/DitherTile.svelte';
   import Toggle from '../ui/Toggle.svelte';
   import LabelValue from '../ui/LabelValue.svelte';
@@ -24,6 +24,7 @@
   let family = $state<ModelFamily>(prefs.family);
   let colour = $state<ColourChoice>(prefs.colour);
   let timeControl = $state<TimeControl>(prefs.timeControl);
+  let rated = $state(prefs.rated);
   let level = $state(0);
   let panel: HTMLElement;
   let opener: HTMLElement | null = null;
@@ -44,7 +45,7 @@
     }
     return availability.kind === 'queued' ? 'Preparing model' : 'Install model';
   });
-  const rated = $derived(isRatable(timeControl));
+  const speed = $derived(SPEED_LABEL[speedOf(timeControl)]);
 
   // Pick a model that covers this persona's level, and snap the level to what it covers.
   $effect.pre(() => {
@@ -71,18 +72,18 @@
   }
 
   function play() {
-    savePrefs({ family, colour, timeControl });
+    remember();
     if (waiting) return;
     if (!canPlay) {
       router.go({ name: 'models' });
       return;
     }
-    session.pending = { persona: persona.id, family, level, colour, timeControl };
+    session.pending = { persona: persona.id, family, level, colour, timeControl, rated };
     router.go({ name: 'game' });
   }
 
   function remember() {
-    savePrefs({ family, colour, timeControl });
+    savePrefs({ family, colour, timeControl, rated });
   }
 
   function focusables(): HTMLElement[] {
@@ -127,7 +128,7 @@
   const tcOptions = TIME_CONTROLS.map((tc) => ({
     value: tc,
     label: formatTimeControl(tc),
-    title: isRatable(tc) ? 'Rapid: rated' : `${classify(tc)}: unrated`
+    title: `${SPEED_LABEL[speedOf(tc)]} rating`
   }));
   const calibrationNote = $derived(
     family === 'fastelo'
@@ -212,12 +213,24 @@
           }}
         />
         <Toggle
-          legend={rated ? 'Clock · rated' : 'Clock · unrated'}
+          legend="Clock · {speed}"
           value={timeControl}
           options={tcOptions}
           equals={(a, b) => a.base === b.base && a.increment === b.increment}
           onchange={(v) => {
             timeControl = v;
+            remember();
+          }}
+        />
+        <Toggle
+          legend="Game"
+          value={rated}
+          options={[
+            { value: true, label: 'Rated', title: `Counts for your ${speed.toLowerCase()} rating` },
+            { value: false, label: 'Casual', title: 'Does not count for any rating' }
+          ]}
+          onchange={(v) => {
+            rated = v;
             remember();
           }}
         />

@@ -71,8 +71,10 @@ describe('setup preferences', () => {
   it('round-trips and rejects garbage', () => {
     const s = memory();
     expect(loadPrefs(s)).toEqual(DEFAULT_PREFS);
-    savePrefs({ family: 'maia2', colour: 'black', timeControl: { base: 600, increment: 5 } }, s);
-    expect(loadPrefs(s)).toEqual({ family: 'maia2', colour: 'black', timeControl: { base: 600, increment: 5 } });
+    savePrefs({ family: 'maia2', colour: 'black', timeControl: { base: 600, increment: 5 }, rated: false }, s);
+    expect(loadPrefs(s)).toEqual({ family: 'maia2', colour: 'black', timeControl: { base: 600, increment: 5 }, rated: false });
+    s.setItem('dither.setup', '{"family":"maia3","colour":"white","timeControl":{"base":180,"increment":2}}');
+    expect(loadPrefs(s).rated).toBe(true); // prefs saved before the rated choice existed
     s.setItem('dither.setup', '{"family":"stockfish","colour":7}');
     expect(loadPrefs(s)).toEqual(DEFAULT_PREFS);
   });

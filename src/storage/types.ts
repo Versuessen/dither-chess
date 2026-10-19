@@ -4,7 +4,7 @@
  */
 import type { MoveRecord } from '../chess/game';
 import type { Outcome } from '../chess/rules';
-import type { TimeControl } from '../chess/timeControl';
+import type { Speed, TimeControl } from '../chess/timeControl';
 import type { ModelFamily } from '../models/catalog';
 
 export interface StoredGame {
@@ -51,9 +51,10 @@ export interface StoredQuality {
 
 /**
  * The rating ledger (rating/ledger.ts): append-only, replayed from the start to get every rating.
- * A row is a rated game, or a change of the rating settings, which takes effect from that point.
+ * A row is a rated game, a change of the rating settings (which takes effect from that point), or
+ * the player taking a game out of the rating (or putting it back).
  */
-export type LedgerEntry = LedgerGame | LedgerSettings;
+export type LedgerEntry = LedgerGame | LedgerSettings | LedgerExclusion;
 
 interface LedgerBase {
   seq: number;
@@ -66,6 +67,8 @@ interface LedgerBase {
 export interface LedgerGame extends LedgerBase {
   kind: 'game';
   gameId: string;
+  /** Rating pool; rows written before pools existed are rapid (the only rated speed then). */
+  speed?: Speed;
   /** The bot's rating (Lichess rapid scale). */
   opponentRating: number;
   /** 1, 0.5 or 0 from the player's point of view. */
@@ -80,6 +83,13 @@ export interface LedgerSettings extends LedgerBase {
   settings: RatingSettings;
 }
 
+/** Takes a rated game out of the rating, or (excluded: false) puts it back. The latest row wins. */
+export interface LedgerExclusion extends LedgerBase {
+  kind: 'exclusion';
+  gameId: string;
+  excluded: boolean;
+}
+
 /** The documented deviations from FIDE, as settings. */
 export interface RatingSettings {
   /** Rating of the two hypothetical opponents in an initial rating (FIDE: 1800). */
@@ -91,7 +101,7 @@ export interface RatingSettings {
 }
 
 /** A ledger row before storage gives it a sequence number. */
-export type LedgerEntryInput = Omit<LedgerGame, 'seq'> | Omit<LedgerSettings, 'seq'>;
+export type LedgerEntryInput = Omit<LedgerGame, 'seq'> | Omit<LedgerSettings, 'seq'> | Omit<LedgerExclusion, 'seq'>;
 
 export interface Backup {
   format: 'dither-backup';

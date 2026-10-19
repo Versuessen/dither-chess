@@ -3,42 +3,51 @@
  * localStorage instead because they must apply before the first paint.
  */
 import { storage } from '../storage';
+import { DEFAULT_COLOURS, sanitizeColours, type ColourSettings } from './colours';
 
-export type BoardColours = 'classic' | 'duotone';
 export type PieceSet = 'cburnett' | 'dither';
 
 export interface AppSettings {
-  boardColours: BoardColours;
+  colours: ColourSettings;
   pieceSet: PieceSet;
   coordinates: boolean;
   sounds: boolean;
+  /** Quiet ambient music on the menus and in games. */
+  music: boolean;
   /** Bot moves as soon as inference finishes, with no human-like pause. */
   instantBot: boolean;
   premoves: boolean;
   showDests: boolean;
   /** Promote to a queen without asking. */
   autoQueen: boolean;
+  /** Developer details (PGN headers, engine internals); toggled from the © on the home screen. */
+  devMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  boardColours: 'classic',
+  colours: DEFAULT_COLOURS,
   pieceSet: 'cburnett',
   coordinates: true,
   sounds: true,
+  music: false,
   instantBot: false,
   premoves: true,
   showDests: true,
-  autoQueen: false
+  autoQueen: false,
+  devMode: false
 };
 
 const KEY = 'app';
+const FLAGS = ['coordinates', 'sounds', 'music', 'instantBot', 'premoves', 'showDests', 'autoQueen', 'devMode'] as const;
 
-function sanitize(v: Partial<AppSettings> | undefined): AppSettings {
-  const s = { ...DEFAULT_SETTINGS };
+function sanitize(v: (Partial<AppSettings> & { boardColours?: unknown }) | undefined): AppSettings {
+  const s: AppSettings = { ...DEFAULT_SETTINGS, colours: { ...DEFAULT_COLOURS } };
   if (!v || typeof v !== 'object') return s;
-  if (v.boardColours === 'classic' || v.boardColours === 'duotone') s.boardColours = v.boardColours;
+  s.colours = sanitizeColours(v.colours);
+  // Settings saved before colours were customisable had only a board preset.
+  if (!v.colours && v.boardColours === 'duotone') s.colours.board = 'duotone';
   if (v.pieceSet === 'cburnett' || v.pieceSet === 'dither') s.pieceSet = v.pieceSet;
-  for (const k of ['coordinates', 'sounds', 'instantBot', 'premoves', 'showDests', 'autoQueen'] as const) {
+  for (const k of FLAGS) {
     if (typeof v[k] === 'boolean') s[k] = v[k];
   }
   return s;
@@ -54,6 +63,10 @@ class SettingsStore {
   async update(patch: Partial<AppSettings>): Promise<void> {
     this.value = { ...this.value, ...patch };
     await storage().setSetting(KEY, $state.snapshot(this.value));
+  }
+
+  updateColours(patch: Partial<ColourSettings>): Promise<void> {
+    return this.update({ colours: { ...this.value.colours, ...patch } });
   }
 }
 

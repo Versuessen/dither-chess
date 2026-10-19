@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { boardPalette } from '../app/colours';
   import { onMount, untrack } from 'svelte';
   import type { Key } from 'chessground/types';
   import Board from '../game/Board.svelte';
@@ -14,7 +15,7 @@
   import { session } from '../app/session.svelte';
   import { personaById } from '../bots/personas';
   import { modelInfo } from '../models/catalog';
-  import { formatTimeControl, isRatable } from '../chess/timeControl';
+  import { formatTimeControl, speedOf, SPEED_LABEL } from '../chess/timeControl';
   import type { GameSetup } from '../chess/setup';
   import type { Opponent } from '../bots/opponent';
   import type { AppStorage, StoredGame } from '../storage/types';
@@ -70,6 +71,7 @@
         persona: setup.persona,
         humanColor,
         timeControl: setup.timeControl,
+        rated: setup.rated,
         instantBot: () => settings.value.instantBot,
         storage,
         onFinished: async (g) => {
@@ -106,7 +108,7 @@
       disposed = true;
       cancelAnimationFrame(raf);
       window.removeEventListener('beforeunload', beforeUnload);
-      if (controller && !controller.outcome) controller.abandon();
+      if (controller && !controller.outcome) controller.abort();
       controller?.opts.opponent.dispose();
       controller?.dispose();
     };
@@ -203,8 +205,9 @@
     return `${m.color === c.humanColor ? 'You played' : 'The bot played'} ${spokenSan(m.san)}`;
   });
 
+  /** Leaving aborts the game (never rated); a game under way asks first. */
   function leave() {
-    if (controller && !controller.outcome && controller.moves.length > 0 && !controller.canAbort) {
+    if (controller && !controller.outcome && controller.moves.some((m) => m.color === controller!.humanColor)) {
       confirm = 'leave';
       return;
     }
@@ -219,7 +222,7 @@
     if (!c) return;
     if (what === 'resign') c.resign();
     else if (what === 'leave') {
-      c.abandon();
+      c.abort();
       router.go({ name: 'home' });
     } else if (what === 'takeback') c.takeback();
   }
@@ -292,7 +295,14 @@
     }
   }
 
-  const rated = $derived(controller ? controller.rated : isRatable(setup.timeControl));
+  const rated = $derived(controller ? controller.rated : setup.rated);
+  const speed = $derived(speedOf(setup.timeControl));
+  const bothMoved = $derived(!!controller && controller.moves.some((m) => m.color === 'w') && controller.moves.some((m) => m.color === 'b'));
+
+  function setPace(instant: boolean) {
+    void settings.update({ instantBot: instant });
+    if (instant) controller?.hurry();
+  }
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -306,7 +316,7 @@
 >
   <a class="corner top-left wordmark" href={href({ name: 'home' })} onclick={(e) => { e.preventDefault(); leave(); }}>DITHER</a>
   <div class="corner top-right status">
-    <span>{rated ? 'Rated' : 'Casual'}</span>
+    <span>{rated ? `Rated ${SPEED_LABEL[speed]}` : 'Casual'}</span>
     <span>{formatTimeControl(setup.timeControl)}</span>
   </div>
 
@@ -339,7 +349,7 @@
               coordinates={settings.value.coordinates}
               showDests={settings.value.showDests}
               premoves={settings.value.premoves && live}
-              colours={settings.value.boardColours}
+              palette={boardPalette(settings.value.colours)}
               pieceSet={settings.value.pieceSet}
               animate={!ui.reducedMotion}
               viewOnly={!live || !controller || !!controller.outcome}
@@ -365,7 +375,13 @@
             <span class="label scale">Lichess rapid</span>
           </div>
           <Clock ms={botClock} active={controller?.clockRunning === botColor} label="Opponent's clock" />
-          <div class="thinking label" aria-live="polite">{controller?.thinking ? 'Thinking' : ' '}</div>
+          <div class="pace-row">
+            <div class="pace" role="group" aria-label="Bot pace">
+              <button type="button" aria-pressed={!settings.value.instantBot} onclick={() => setPace(false)} title="Pauses like a human player of its level">Human</button>
+              <button type="button" aria-pressed={settings.value.instantBot} onclick={() => setPace(true)} title="Moves as soon as it has chosen">Instant</button>
+            </div>
+            <span class="thinking label" aria-live="polite">{controller?.thinking ? 'Thinking' : ' '}</span>
+          </div>
           <p class="sr-only" aria-live="polite" aria-atomic="true">{announcement}</p>
 
           <div class="moves">
@@ -384,11 +400,11 @@
           {#if controller?.outcome}
             <section class="result" aria-live="polite">
               <p class="big">{controller.outcome.result === '*' ? 'Aborted' : controller.outcome.result}</p>
-              <p class="note">{controller.resultText}{controller.outcome.result !== '*' ? (controller.rated ? ' · rated' : ' · casual') : ''}</p>
-              {#if controller.outcome.result !== '*' && controller.rated && rating.state}
-                {@const rs = rating.state}
+              <p class="note">{controller.resultText}{controller.outcome.result !== '*' ? (controller.rated ? ` · rated ${SPEED_LABEL[speed].toLowerCase()}` : ' · casual') : ' · not rated'}</p>
+              {#if controller.outcome.result !== '*' && controller.rated && rating.of(speed)}
+                {@const rs = rating.of(speed)!}
                 <p class="note rating-line" data-testid="rating-after">
-                  Rating {ratingLabel(rs, 'live')}{rs.published !== null && rs.live !== null && rs.live !== rs.published
+                  {SPEED_LABEL[speed]} rating {ratingLabel(rs, 'live')}{rs.published !== null && rs.live !== null && rs.live !== rs.published
                     ? ` live (${rs.live - rs.published > 0 ? '+' : ''}${rs.live - rs.published} this month)`
                     : rs.published === null && rs.live !== null
                       ? ' provisional'
@@ -425,11 +441,11 @@
                 {confirm === 'resign'
                   ? 'Resign this game?'
                   : confirm === 'leave'
-                    ? 'Leave the game? It counts as a loss.'
+                    ? 'Leave and abort this game? Aborted games never count for your rating.'
                     : 'A takeback makes this game unrated. Take back?'}
               </p>
               <div class="actions">
-                <button class="primary" onclick={doConfirm}>{confirm === 'resign' ? 'Resign' : confirm === 'leave' ? 'Leave' : 'Take back'}</button>
+                <button class="primary" onclick={doConfirm}>{confirm === 'resign' ? 'Resign' : confirm === 'leave' ? 'Abort and leave' : 'Take back'}</button>
                 <button onclick={() => (confirm = null)}>Cancel</button>
               </div>
             </div>
@@ -448,15 +464,14 @@
               <span id="typed-error" class="typed-error" role="status">{typedError ?? ''}</span>
             </form>
             <div class="controls">
-              {#if controller.canAbort}
-                <button onclick={() => controller!.abort()}>Abort</button>
-              {:else}
+              {#if bothMoved}
                 <button onclick={() => (confirm = 'resign')}>Resign</button>
               {/if}
+              <button onclick={() => controller!.abort()} title="End the game without a result; it never counts for your rating">Abort</button>
               {#if controller.claimable && controller.humanToMove}
                 <button onclick={() => controller!.claimDraw()}>Claim draw</button>
               {:else}
-                <button disabled={!controller.canOfferDraw() || controller.canAbort} onclick={() => controller!.offerDraw()}>Offer draw</button>
+                <button disabled={!controller.canOfferDraw() || !bothMoved} onclick={() => controller!.offerDraw()}>Offer draw</button>
               {/if}
               <button disabled={!controller.moves.some((m) => m.color === controller!.humanColor)} onclick={takeback}>Takeback</button>
               <button onclick={() => (orientation = orientation === 'white' ? 'black' : 'white')} aria-label="Flip board">Flip</button>
@@ -552,9 +567,34 @@
   .scale {
     font-size: 11px;
   }
+  .pace-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 1.6em;
+  }
+  .pace {
+    display: inline-flex;
+    border: var(--hairline) solid var(--panel-muted);
+    border-radius: var(--radius);
+    overflow: hidden;
+    font-size: 11px;
+  }
+  .pace button {
+    padding: 3px 9px;
+    color: var(--panel-muted);
+    letter-spacing: 0.14em;
+  }
+  .pace button[aria-pressed='true'] {
+    background: var(--panel-ink);
+    color: var(--panel);
+  }
+  .pace button:focus-visible {
+    outline: 2px solid var(--panel-ink);
+    outline-offset: -2px;
+  }
   .thinking {
     min-height: 1.2em;
-    text-align: right;
   }
   .moves {
     min-height: 0;

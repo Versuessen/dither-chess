@@ -27,6 +27,8 @@ export interface ControllerOptions {
   persona: string;
   humanColor: Color;
   timeControl: TimeControl;
+  /** The player chose a rated game (it still becomes unrated on a takeback or an abort). */
+  rated?: boolean;
   instantBot: () => boolean;
   storage: AppStorage | null;
   /** Called once when a game ends, after it has been saved. */
@@ -64,6 +66,7 @@ export class GameController {
 
   private rng: Rng;
   private pending: unknown = null;
+  private pendingMove: (() => void) | null = null;
   private botToken = 0;
   private lostStreak = 0;
   private drawOfferedAtPly = -Infinity;
@@ -76,7 +79,8 @@ export class GameController {
       timeControl: opts.timeControl,
       humanColor: opts.humanColor,
       fen: opts.startFen,
-      now: opts.now
+      now: opts.now,
+      rated: opts.rated ?? true
     });
     this.rng = createRng(opts.opponent.seed ^ 0x5bd1e995);
     this.sync();
@@ -156,15 +160,6 @@ export class GameController {
     void this.end();
   }
 
-  /** Leaving the screen mid-game. */
-  abandon(): void {
-    if (this.outcome) return;
-    this.cancelBot();
-    this.game.abandon();
-    this.sync();
-    void this.end();
-  }
-
   claimDraw(): boolean {
     if (!this.humanToMove || !this.game.claim()) return false;
     this.cancelBot();
@@ -223,6 +218,7 @@ export class GameController {
     this.botToken++;
     if (this.pending !== null) (this.opts.clearTimeout ?? clearTimeout)(this.pending as ReturnType<typeof setTimeout>);
     this.pending = null;
+    this.pendingMove = null;
     this.thinking = false;
   }
 
@@ -283,12 +279,14 @@ export class GameController {
             remaining: this.game.clock.timeLeft(botColor),
             increment: this.opts.timeControl.increment * 1000,
             base: this.opts.timeControl.base * 1000,
-            inferenceMs: thought.inferenceMs
+            inferenceMs: thought.inferenceMs,
+            level: this.opts.opponent.level
           },
           this.rng
         );
     const playIt = () => {
       this.pending = null;
+      this.pendingMove = null;
       if (token !== this.botToken || this.disposed || this.outcome) return;
       this.thinking = false;
       try {
@@ -306,7 +304,18 @@ export class GameController {
       this.onBotMoved?.();
     };
     if (delay <= 0) playIt();
-    else this.pending = (this.opts.setTimeout ?? setTimeout)(playIt, delay);
+    else {
+      this.pendingMove = playIt;
+      this.pending = (this.opts.setTimeout ?? setTimeout)(playIt, delay);
+    }
+  }
+
+  /** Play the bot's chosen move now instead of finishing its human-like pause (pace set to Instant). */
+  hurry(): void {
+    const fn = this.pendingMove;
+    if (!fn || this.pending === null) return;
+    (this.opts.clearTimeout ?? clearTimeout)(this.pending as ReturnType<typeof setTimeout>);
+    fn();
   }
 
   /** Hook for the board: play a queued premove right after the bot's move. */

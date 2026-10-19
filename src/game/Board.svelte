@@ -9,7 +9,9 @@
   import { Chessground } from 'chessground';
   import type { Api } from 'chessground/api';
   import type { Key, Color as CgColor, Dests } from 'chessground/types';
-  import type { BoardColours, PieceSet } from '../app/settings.svelte';
+  import type { PieceSet } from '../app/settings.svelte';
+  import type { BoardPalette } from '../app/colours';
+  import { premoveDests } from '../chess/premove';
 
   interface Props {
     fen: string;
@@ -23,10 +25,10 @@
     coordinates: boolean;
     showDests: boolean;
     premoves: boolean;
-    colours: BoardColours;
+    palette: BoardPalette;
     pieceSet: PieceSet;
     animate: boolean;
-    /** No moves or premoves (review, game over). Drawing arrows still works. */
+    /** No moves or premoves (review, game over). Marking squares and drawing arrows still work. */
     viewOnly?: boolean;
     label: string;
     onmove: (orig: Key, dest: Key) => void;
@@ -34,12 +36,101 @@
   let props: Props = $props();
 
   let el: HTMLDivElement;
+  let arrowsEl: SVGSVGElement;
   let api: Api | null = null;
 
   // chessground only binds its input events if `viewOnly` is false when it is created, so the
   // read-only state is expressed through `movable`/`premovable` instead of `viewOnly`.
   const movableColor = () => (props.viewOnly ? undefined : props.movableColor);
   const premoves = () => props.premoves && !props.viewOnly;
+  /** Premove squares never include the mover's own pieces (src/chess/premove.ts). */
+  const premoveSquares = () => (props.movableColor ? (premoveDests(props.fen, props.movableColor) as Dests) : new Map());
+
+  // Right-click annotations, as on chess.com: a click marks a square red, a drag draws an arrow
+  // (knight moves bend round the corner), a left click clears them all.
+  let marks = $state<Key[]>([]);
+  let arrows = $state<{ from: Key; to: Key }[]>([]);
+  let dragFrom: Key | null = null;
+
+  function squareAt(clientX: number, clientY: number): Key | null {
+    const r = (el.querySelector('cg-container') ?? el).getBoundingClientRect();
+    const fx = Math.floor(((clientX - r.left) / r.width) * 8);
+    const fy = Math.floor(((clientY - r.top) / r.height) * 8);
+    if (fx < 0 || fx > 7 || fy < 0 || fy > 7) return null;
+    const white = props.orientation === 'white';
+    const file = white ? fx : 7 - fx;
+    const rank = white ? 7 - fy : fy;
+    return `${'abcdefgh'[file]}${rank + 1}` as Key;
+  }
+
+  function onPointerDown(e: PointerEvent) {
+    if (e.button === 2) {
+      dragFrom = squareAt(e.clientX, e.clientY);
+      e.preventDefault();
+    } else if (e.button === 0 && (marks.length || arrows.length)) {
+      marks = [];
+      arrows = [];
+    }
+  }
+
+  function onPointerUp(e: PointerEvent) {
+    if (e.button !== 2 || !dragFrom) return;
+    const to = squareAt(e.clientX, e.clientY);
+    const from = dragFrom;
+    dragFrom = null;
+    if (!to) return;
+    if (to === from) {
+      marks = marks.includes(to) ? marks.filter((k) => k !== to) : [...marks, to];
+    } else {
+      const i = arrows.findIndex((a) => a.from === from && a.to === to);
+      arrows = i >= 0 ? arrows.filter((_, j) => j !== i) : [...arrows, { from, to }];
+    }
+  }
+
+  /** Square centre in board units (0..8), with the board's orientation. */
+  function centre(k: Key): [number, number] {
+    const file = k.charCodeAt(0) - 97;
+    const rank = Number(k[1]) - 1;
+    const white = props.orientation === 'white';
+    return [(white ? file : 7 - file) + 0.5, (white ? 7 - rank : rank) + 0.5];
+  }
+
+  /** Arrow path points: straight, or for a knight's jump the long leg first, then the short one. */
+  function arrowPoints(from: Key, to: Key): [number, number][] {
+    const a = centre(from);
+    const b = centre(to);
+    const dx = Math.abs(b[0] - a[0]);
+    const dy = Math.abs(b[1] - a[1]);
+    if ((dx === 1 && dy === 2) || (dx === 2 && dy === 1)) {
+      const corner: [number, number] = dy === 2 ? [a[0], b[1]] : [b[0], a[1]];
+      return [a, corner, b];
+    }
+    return [a, b];
+  }
+
+  /** Shorten the last leg so the head ends inside the target square, and start off the piece. */
+  function arrowGeometry(from: Key, to: Key) {
+    const pts = arrowPoints(from, to).map((p) => [...p] as [number, number]);
+    const head = 0.42;
+    const first = pts[0]!;
+    const second = pts[1]!;
+    const d0 = Math.hypot(second[0] - first[0], second[1] - first[1]);
+    first[0] += ((second[0] - first[0]) / d0) * 0.18;
+    first[1] += ((second[1] - first[1]) / d0) * 0.18;
+    const end = pts[pts.length - 1]!;
+    const prev = pts[pts.length - 2]!;
+    const len = Math.hypot(end[0] - prev[0], end[1] - prev[1]);
+    const ux = (end[0] - prev[0]) / len;
+    const uy = (end[1] - prev[1]) / len;
+    const tip: [number, number] = [end[0] + ux * 0.12, end[1] + uy * 0.12];
+    const base: [number, number] = [tip[0] - ux * head, tip[1] - uy * head];
+    pts[pts.length - 1] = base;
+    const w = 0.24;
+    const headPts = [tip, [base[0] - uy * w, base[1] + ux * w], [base[0] + uy * w, base[1] - ux * w]];
+    return { line: pts.map((p) => p.join(',')).join(' '), head: headPts.map((p) => p.join(',')).join(' ') };
+  }
+
+  const highlights = $derived(new Map(marks.map((k) => [k, 'marked'] as const)));
 
   onMount(() => {
     api = Chessground(el, {
@@ -54,7 +145,7 @@
       disableContextMenu: true,
       blockTouchScroll: true,
       animation: { enabled: props.animate, duration: 160 },
-      highlight: { lastMove: true, check: true },
+      highlight: { lastMove: true, check: true, custom: highlights },
       movable: {
         free: false,
         color: movableColor(),
@@ -62,11 +153,14 @@
         showDests: props.showDests,
         events: { after: (orig, dest) => props.onmove(orig, dest) }
       },
-      premovable: { enabled: premoves(), showDests: props.showDests, castle: true },
+      premovable: { enabled: premoves(), showDests: props.showDests, castle: true, customDests: premoveSquares() },
       draggable: { enabled: true, showGhost: true },
       selectable: { enabled: true },
-      drawable: { enabled: true, visible: true }
+      // Annotations are drawn by this component (marks as squares, bent knight arrows).
+      drawable: { enabled: false, visible: false }
     });
+    // The arrow layer lives inside chessground's own container, so it shares its exact box.
+    el.querySelector('cg-container')?.appendChild(arrowsEl);
     return () => {
       api?.destroy();
       api = null;
@@ -83,7 +177,8 @@
       coordinates: props.coordinates,
       animation: { enabled: props.animate, duration: 160 },
       movable: { color: movableColor(), dests: props.dests, showDests: props.showDests },
-      premovable: { enabled: premoves(), showDests: props.showDests }
+      premovable: { enabled: premoves(), showDests: props.showDests, customDests: premoveSquares() },
+      highlight: { lastMove: true, check: true, custom: highlights }
     };
     if (!api) return;
     if (!config.premovable.enabled) api.cancelPremove();
@@ -105,16 +200,34 @@
     api?.set({ fen: props.fen, lastMove: props.lastMove });
   }
 
-  const squares = Array.from({ length: 64 }, (_, i) => ((i >> 3) + (i & 7)) % 2 === 1);
+  const style = $derived(
+    [
+      `--sq-light:${props.palette.light}`,
+      `--sq-dark:${props.palette.dark}`,
+      `--hl-move:${props.palette.move}`,
+      `--hl-premove:${props.palette.premove}`,
+      `--hl-mark:${props.palette.mark}`,
+      `--hl-arrow:${props.palette.arrow}`
+    ].join(';')
+  );
 </script>
 
-<div class="board colours-{props.colours}" role="application" aria-label={props.label}>
-  <div class="squares" aria-hidden="true">
-    {#each squares as dark, i (i)}
-      <span class:dark></span>
-    {/each}
-  </div>
+<div
+  class="board"
+  role="application"
+  aria-label={props.label}
+  {style}
+  onpointerdowncapture={onPointerDown}
+  onpointerup={onPointerUp}
+>
   <div bind:this={el} class="cg pieces-{props.pieceSet}"></div>
+  <svg bind:this={arrowsEl} class="arrows" viewBox="0 0 8 8" aria-hidden="true">
+    {#each arrows as a (a.from + a.to)}
+      {@const g = arrowGeometry(a.from, a.to)}
+      <polyline points={g.line} />
+      <polygon points={g.head} />
+    {/each}
+  </svg>
 </div>
 
 <style>
@@ -125,42 +238,32 @@
     user-select: none;
     touch-action: none;
   }
-  .squares {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    grid-template-rows: repeat(8, 1fr);
-  }
-  .squares span {
-    background: var(--sq-light);
-  }
-  .squares span.dark {
-    background: var(--sq-dark);
-  }
-  .colours-classic {
-    --sq-light: var(--sq-classic-light);
-    --sq-dark: var(--sq-classic-dark);
-  }
-  .colours-duotone {
-    --sq-light: var(--sq-duo-light);
-    --sq-dark: var(--sq-duo-dark);
-  }
   .cg {
     position: absolute;
     inset: 0;
   }
+  /* The squares are painted on chessground's own board element, so they share the exact box the
+     pieces are positioned in (a separate grid rounded differently and pieces sat off-centre).
+     A 2x2-square tile: dark top-right and bottom-left, as a8/h1 are light from either side. */
   .cg :global(cg-board) {
-    background: transparent;
+    background-color: var(--sq-light);
+    background-image: conic-gradient(var(--sq-dark) 0 25%, transparent 0 50%, var(--sq-dark) 0 75%, transparent 0);
+    background-size: 25% 25%;
   }
   .cg :global(cg-board square.last-move) {
-    background: color-mix(in srgb, #111 20%, transparent);
+    background: color-mix(in srgb, var(--hl-move) 55%, transparent);
   }
   .cg :global(cg-board square.selected) {
-    background: color-mix(in srgb, #111 30%, transparent);
+    background: color-mix(in srgb, var(--hl-move) 72%, transparent);
   }
   .cg :global(cg-board square.check) {
-    background: color-mix(in srgb, var(--flag) 62%, transparent);
+    background: radial-gradient(circle, color-mix(in srgb, var(--flag) 85%, transparent) 0 35%, transparent 72%);
+  }
+  .cg :global(cg-board square.marked) {
+    background: color-mix(in srgb, var(--hl-mark) 78%, transparent);
+  }
+  .cg :global(cg-board square.current-premove) {
+    background: color-mix(in srgb, var(--hl-premove) 62%, transparent);
   }
   .cg :global(cg-board square.move-dest::after),
   .cg :global(cg-board square.premove-dest::after) {
@@ -168,22 +271,40 @@
     position: absolute;
     inset: 37%;
     border-radius: 50%;
-    background: color-mix(in srgb, #111 38%, transparent);
+    background: color-mix(in srgb, #111 30%, transparent);
   }
   .cg :global(cg-board square.premove-dest::after) {
-    background: color-mix(in srgb, #111 22%, transparent);
+    background: color-mix(in srgb, var(--hl-premove) 55%, transparent);
   }
   .cg :global(cg-board square.move-dest.oc::after),
   .cg :global(cg-board square.premove-dest.oc::after) {
     inset: 3%;
     background: transparent;
-    border: 0.32em solid color-mix(in srgb, #111 38%, transparent);
+    border: 0.32em solid color-mix(in srgb, #111 30%, transparent);
+  }
+  .cg :global(cg-board square.premove-dest.oc::after) {
+    border-color: color-mix(in srgb, var(--hl-premove) 55%, transparent);
   }
   .cg :global(cg-board square.move-dest:hover) {
-    background: color-mix(in srgb, #111 18%, transparent);
+    background: color-mix(in srgb, var(--hl-move) 35%, transparent);
   }
-  .cg :global(cg-board square.current-premove) {
-    background: color-mix(in srgb, #111 34%, transparent);
+  .arrows {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 3;
+    opacity: 0.82;
+  }
+  .arrows polyline {
+    fill: none;
+    stroke: var(--hl-arrow);
+    stroke-width: 0.2;
+    stroke-linejoin: round;
+  }
+  .arrows polygon {
+    fill: var(--hl-arrow);
   }
   .cg :global(coords) {
     font-family: var(--font-ui);

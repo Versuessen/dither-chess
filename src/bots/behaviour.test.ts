@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../lib/rng';
-import { acceptsDraw, claimsDraw, materialBalance, resigns, thinkTime, type ThinkInput } from './behaviour';
+import { THINK_CAP, acceptsDraw, claimsDraw, materialBalance, resigns, thinkTime, type ThinkInput } from './behaviour';
 
 const base: ThinkInput = {
   ply: 30,
@@ -10,7 +10,8 @@ const base: ThinkInput = {
   remaining: 600_000,
   increment: 10_000,
   base: 900_000,
-  inferenceMs: 0
+  inferenceMs: 0,
+  level: 1500
 };
 
 const median = (f: (rng: ReturnType<typeof createRng>) => number) => {
@@ -50,10 +51,23 @@ describe('thinkTime', () => {
     expect(fast).toBeLessThan(a);
   });
 
+  it('is quicker for weaker bots and never pauses longer than the cap', () => {
+    const weak = median((r) => thinkTime({ ...base, level: 800, entropy: 2.4 }, r));
+    const strong = median((r) => thinkTime({ ...base, level: 2300, entropy: 2.4 }, r));
+    expect(weak).toBeLessThan(strong);
+    const rng = createRng(9);
+    for (let i = 0; i < 2000; i++) {
+      const level = 400 + rng.next() * 2400;
+      const ms = thinkTime({ ...base, level, entropy: 3.4, remaining: 3_600_000, increment: 30_000 }, rng);
+      expect(ms).toBeLessThanOrEqual(THINK_CAP.high);
+      if (level <= 600) expect(ms).toBeLessThanOrEqual(THINK_CAP.low);
+    }
+  });
+
   it('paces untimed games', () => {
     const t = median((r) => thinkTime({ ...base, remaining: Infinity, increment: 0, base: 0 }, r));
     expect(t).toBeGreaterThan(300);
-    expect(t).toBeLessThan(60_000);
+    expect(t).toBeLessThan(THINK_CAP.high);
   });
 });
 

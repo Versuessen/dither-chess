@@ -1,10 +1,9 @@
 /**
- * Games left unfinished by a crash or a closed window are settled at the next start:
- * once both sides have moved it is a loss by abandonment (as leaving the game screen is);
- * before that it is an abort.
+ * Games left unfinished by a crash or a closed window are settled at the next start as aborted
+ * and unrated, as leaving the game screen is: DITHER is a training tool, so walking away never
+ * costs rating.
  */
 import { toPgn } from '../chess/pgn';
-import { isRatable } from '../chess/timeControl';
 import type { Outcome } from '../chess/rules';
 import type { AppStorage, StoredGame } from '../storage/types';
 
@@ -35,11 +34,8 @@ async function runHooks(g: StoredGame): Promise<void> {
 }
 
 export function settle(g: StoredGame, now = new Date()): StoredGame {
-  const bothMoved = g.moves.some((m) => m.color === 'w') && g.moves.some((m) => m.color === 'b');
-  const outcome: Outcome = bothMoved
-    ? { result: g.humanColor === 'w' ? '0-1' : '1-0', termination: 'abandoned', winner: g.humanColor === 'w' ? 'b' : 'w' }
-    : { result: '*', termination: 'aborted', winner: null };
-  const rated = bothMoved && isRatable(g.timeControl) && g.takebacks === 0;
+  const outcome: Outcome = { result: '*', termination: 'aborted', winner: null };
+  const rated = false;
   const human = 'You';
   const settled: StoredGame = { ...g, outcome, rated, endedAt: now.toISOString() };
   settled.pgn = toPgn({

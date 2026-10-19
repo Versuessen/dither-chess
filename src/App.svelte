@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import DitherLayer from './dither/DitherLayer.svelte';
   import Preloader from './screens/Preloader.svelte';
   import Home from './screens/Home.svelte';
@@ -15,6 +16,7 @@
   import { router } from './app/router.svelte';
   import { ui } from './app/ui.svelte';
   import { themeStore } from './app/themeStore.svelte';
+  import { settings } from './app/settings.svelte';
   import { boot } from './app/boot.svelte';
   import { personaById } from './bots/personas';
 
@@ -37,6 +39,17 @@
 
   $effect(() => {
     document.documentElement.dataset.motion = ui.reducedMotion ? 'reduce' : 'system';
+  });
+
+  // Background colours chosen in Settings override the theme's dither inks.
+  $effect(() => {
+    const { bgShadow, bgLight } = settings.value.colours;
+    const root = document.documentElement.style;
+    for (const [name, v] of [['--dither-shadow', bgShadow], ['--dither-light', bgLight]] as const) {
+      if (v) root.setProperty(name, v);
+      else root.removeProperty(name);
+    }
+    untrack(() => ui.inksVersion++);
   });
 
   function onKeydown(e: KeyboardEvent) {

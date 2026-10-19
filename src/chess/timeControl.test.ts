@@ -3,7 +3,7 @@ import {
   TIME_CONTROLS,
   classify,
   formatTimeControl,
-  isRatable,
+  speedOf,
   parseTimeControl,
   pgnTimeControl,
   projectedMinutes
@@ -29,13 +29,13 @@ describe('FIDE time classification (R&B 1.1)', () => {
     expect(classify(tc(3, 0))).toBe('bullet');
     expect(classify(tc(3, 1))).toBe('blitz');
   });
-  it('untimed is never ratable', () => {
+  it('untimed games join the classical pool', () => {
     expect(classify({ base: 0, increment: 0 })).toBe('untimed');
-    expect(isRatable({ base: 0, increment: 0 })).toBe(false);
+    expect(speedOf({ base: 0, increment: 0 })).toBe('classical');
+    expect(speedOf(tc(60, 30))).toBe('classical');
   });
-  it('offers both rated and unrated clocks', () => {
-    expect(TIME_CONTROLS.filter(isRatable).length).toBeGreaterThanOrEqual(3);
-    expect(TIME_CONTROLS.some((t) => !isRatable(t))).toBe(true);
+  it('offers a clock for every rating pool', () => {
+    expect(new Set(TIME_CONTROLS.map(speedOf))).toEqual(new Set(['bullet', 'blitz', 'rapid', 'classical']));
   });
 });
 

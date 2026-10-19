@@ -15,7 +15,7 @@ import {
   type Color,
   type Outcome
 } from './rules';
-import { isRatable, type TimeControl } from './timeControl';
+import type { TimeControl } from './timeControl';
 
 export interface MoveRecord {
   san: string;
@@ -32,6 +32,8 @@ export interface MoveRecord {
 export interface GameOptions {
   timeControl: TimeControl;
   humanColor: Color;
+  /** The player chose a rated game (any clock; each speed has its own rating). Default: rated. */
+  rated?: boolean;
   /** Start position (FEN); standard start by default. */
   fen?: string;
   now?: Now;
@@ -50,12 +52,14 @@ export class Game {
   private _outcome: Outcome | null = null;
   private _takebacks = 0;
   private started = false;
+  private readonly wantsRated: boolean;
 
   constructor(opts: GameOptions) {
     this.chess = new Chess(opts.fen);
     this.startFen = this.chess.fen();
     this.timeControl = opts.timeControl;
     this.humanColor = opts.humanColor;
+    this.wantsRated = opts.rated ?? true;
     this.clock = new ChessClock(opts.timeControl, opts.now);
     this.keys.push(repetitionKey(this.chess.fen(), true));
   }
@@ -82,9 +86,9 @@ export class Game {
     return this._takebacks;
   }
 
-  /** Rated only for a rapid clock, with no takebacks, and once both sides have moved. */
+  /** Rated when the player chose so, with no takebacks, and not aborted. */
   get rated(): boolean {
-    return isRatable(this.timeControl) && this._takebacks === 0 && this._outcome?.termination !== 'aborted';
+    return this.wantsRated && this._takebacks === 0 && this._outcome?.termination !== 'aborted';
   }
 
   /** Both sides have made at least one move (R&B 4.1: only then is a game rated). */
@@ -206,25 +210,25 @@ export class Game {
     this.finish(decisive(color === 'w' ? 'b' : 'w', 'resignation'));
   }
 
-  /** The human left a game in progress (counts as a loss once both sides have moved). */
-  abandon(): void {
-    if (this.over) return;
-    this.finish(decisive(this.humanColor === 'w' ? 'b' : 'w', 'abandoned'));
-  }
+
 
   agreeDraw(): void {
     if (this.over) return;
     this.finish(drawn('agreement'));
   }
 
-  /** Abort is only possible until both sides have moved. */
+  /**
+   * DITHER is a training tool: a game in progress can always be aborted. It ends without a
+   * result and never touches a rating.
+   */
   canAbort(): boolean {
-    return !this.over && !this.bothMoved;
+    return !this.over;
   }
 
   abort(): boolean {
     if (!this.canAbort()) return false;
-    this.finish({ result: '*', termination: 'aborted', winner: null });
+    this._outcome = { result: '*', termination: 'aborted', winner: null };
+    this.clock.stop();
     return true;
   }
 

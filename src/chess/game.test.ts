@@ -166,7 +166,7 @@ describe('clocks', () => {
 });
 
 describe('rating eligibility', () => {
-  it('only rapid games with both sides moving and no takeback are rated', () => {
+  it('any clock can be rated (each speed has its own pool); casual games never are', () => {
     const g = new Game({ timeControl: rapid, humanColor: 'w' });
     play(g, 'e2e4 e7e5');
     g.resign('w');
@@ -175,7 +175,25 @@ describe('rating eligibility', () => {
     const b = new Game({ timeControl: blitz, humanColor: 'w' });
     play(b, 'e2e4 e7e5');
     b.resign('w');
-    expect(b.rated).toBe(false);
+    expect(b.rated).toBe(true);
+    const u = new Game({ timeControl: untimed, humanColor: 'w' });
+    play(u, 'e2e4 e7e5');
+    u.resign('w');
+    expect(u.rated).toBe(true);
+    const c = new Game({ timeControl: rapid, humanColor: 'w', rated: false });
+    play(c, 'e2e4 e7e5');
+    c.resign('w');
+    expect(c.rated).toBe(false);
+  });
+
+  it('a game can be aborted at any point, and an aborted game is never rated', () => {
+    const g = new Game({ timeControl: rapid, humanColor: 'w' });
+    play(g, 'e2e4 e7e5 g1f3 b8c6');
+    expect(g.canAbort()).toBe(true);
+    g.abort();
+    expect(g.outcome).toEqual({ result: '*', termination: 'aborted', winner: null });
+    expect(g.rated).toBe(false);
+    expect(g.canAbort()).toBe(false);
   });
 
   it('ending before both sides moved is an abort', () => {

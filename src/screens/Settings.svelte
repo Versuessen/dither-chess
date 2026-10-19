@@ -7,7 +7,9 @@
   import { themeStore } from '../app/themeStore.svelte';
   import { ui, type MotionSetting } from '../app/ui.svelte';
   import type { ThemeSetting } from '../app/theme';
-  import { settings, type BoardColours, type PieceSet, type AppSettings } from '../app/settings.svelte';
+  import { settings, type PieceSet, type AppSettings } from '../app/settings.svelte';
+  import { BOARD_PRESETS, DEFAULT_COLOURS, boardPalette, type BoardPreset } from '../app/colours';
+  import ColourField from '../ui/ColourField.svelte';
   import { inference } from '../inference/client';
   import type { InitResult } from '../inference/protocol';
 
@@ -25,6 +27,20 @@
     { value: false, label: 'Off' }
   ];
   const set = (patch: Partial<AppSettings>) => void settings.update(patch);
+  const colours = $derived(settings.value.colours);
+  const palette = $derived(boardPalette(colours));
+  const setColour = (patch: Partial<typeof DEFAULT_COLOURS>) => void settings.updateColours(patch);
+  /** The theme's own background colours, shown while no override is set. */
+  const themeInk = (name: string) => {
+    void ui.theme;
+    if (typeof document === 'undefined') return '#000000';
+    const root = document.documentElement;
+    const inline = root.style.getPropertyValue(name);
+    root.style.removeProperty(name);
+    const v = getComputedStyle(root).getPropertyValue(name).trim();
+    if (inline) root.style.setProperty(name, inline);
+    return /^#[0-9a-f]{6}$/i.test(v) ? v : '#000000';
+  };
 
   const desktop = platform() === 'tauri';
   // The website carries the source of the exact build it runs (AGPL-3.0, see NOTICE).
@@ -81,12 +97,9 @@
       <div class="row">
         <Toggle
           legend="Board colours"
-          value={settings.value.boardColours}
-          options={[
-            { value: 'classic' as BoardColours, label: 'Classic' },
-            { value: 'duotone' as BoardColours, label: 'Duotone' }
-          ]}
-          onchange={(v) => set({ boardColours: v })}
+          value={colours.board}
+          options={BOARD_PRESETS.map((p) => ({ value: p.value as BoardPreset, label: p.label }))}
+          onchange={(v) => void settings.updateColours({ board: v })}
         />
       </div>
       <div class="row">
@@ -107,6 +120,31 @@
         </div>
       {/each}
     </div>
+  </section>
+
+  <section class="group" aria-labelledby="s-colours">
+    <h2 id="s-colours" class="label">Colours</h2>
+    <div class="preview" aria-hidden="true" style="--p-light:{palette.light};--p-dark:{palette.dark};--p-move:{palette.move};--p-premove:{palette.premove};--p-mark:{palette.mark};--p-arrow:{palette.arrow}">
+      {#each Array.from({ length: 16 }, (_, i) => i) as i (i)}
+        <span class:dark={((i >> 2) + (i & 3)) % 2 === 1} class:move={i === 9 || i === 5} class:premove={i === 14} class:mark={i === 3}></span>
+      {/each}
+      <svg viewBox="0 0 4 4"><polyline points="0.5,3.5 0.5,1.7 1.3,1.7" /><polygon points="1.5,1.7 1.18,1.48 1.18,1.92" /></svg>
+    </div>
+    <div class="rows two colours">
+      {#if colours.board === 'custom'}
+        <ColourField label="Light squares" value={colours.customLight} fallback={colours.customLight} onchange={(v) => v && setColour({ customLight: v })} />
+        <ColourField label="Dark squares" value={colours.customDark} fallback={colours.customDark} onchange={(v) => v && setColour({ customDark: v })} />
+      {/if}
+      <ColourField label="Last move and selection" value={colours.move} fallback={colours.move} onchange={(v) => v && setColour({ move: v })} />
+      <ColourField label="Premoves" value={colours.premove} fallback={colours.premove} onchange={(v) => v && setColour({ premove: v })} />
+      <ColourField label="Marked squares (right-click)" value={colours.mark} fallback={colours.mark} onchange={(v) => v && setColour({ mark: v })} />
+      <ColourField label="Arrows (right-drag)" value={colours.arrow} fallback={colours.move} resetLabel="Same as last move" onchange={(v) => setColour({ arrow: v })} />
+      <ColourField label="Background shadow" value={colours.bgShadow} fallback={themeInk('--dither-shadow')} resetLabel="Theme colour" onchange={(v) => setColour({ bgShadow: v })} />
+      <ColourField label="Background light" value={colours.bgLight} fallback={themeInk('--dither-light')} resetLabel="Theme colour" onchange={(v) => setColour({ bgLight: v })} />
+    </div>
+    <p class="hint">
+      <button type="button" class="link" onclick={() => void settings.update({ colours: { ...DEFAULT_COLOURS } })}>Reset all colours</button>
+    </p>
   </section>
 
   <section class="group" aria-labelledby="s-system">
@@ -152,6 +190,50 @@
     .rows.two {
       grid-template-columns: 1fr;
     }
+  }
+  .preview {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(4, 34px);
+    grid-template-rows: repeat(4, 34px);
+    margin-bottom: 22px;
+    width: max-content;
+  }
+  .preview span {
+    background: var(--p-light);
+  }
+  .preview span.dark {
+    background: var(--p-dark);
+  }
+  .preview span.move {
+    background-image: linear-gradient(color-mix(in srgb, var(--p-move) 55%, transparent) 0 0);
+  }
+  .preview span.premove {
+    background-image: linear-gradient(color-mix(in srgb, var(--p-premove) 62%, transparent) 0 0);
+  }
+  .preview span.mark {
+    background-image: linear-gradient(color-mix(in srgb, var(--p-mark) 78%, transparent) 0 0);
+  }
+  .preview svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.82;
+  }
+  .preview polyline {
+    fill: none;
+    stroke: var(--p-arrow);
+    stroke-width: 0.2;
+    stroke-linejoin: round;
+  }
+  .preview polygon {
+    fill: var(--p-arrow);
+  }
+  .link {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    color: var(--panel-ink);
   }
   /* Links inside running text are underlined so they do not rely on colour alone. */
   .hint a {

@@ -11,12 +11,15 @@ export interface GameSetup {
   level: number;
   colour: ColourChoice;
   timeControl: TimeControl;
+  /** Counts for the rating of the time control's speed. */
+  rated: boolean;
 }
 
 export interface SetupPrefs {
   family: ModelFamily;
   colour: ColourChoice;
   timeControl: TimeControl;
+  rated: boolean;
 }
 
 const KEY = 'dither.setup';
@@ -24,7 +27,8 @@ const KEY = 'dither.setup';
 export const DEFAULT_PREFS: SetupPrefs = {
   family: 'fastelo',
   colour: 'random',
-  timeControl: DEFAULT_TIME_CONTROL
+  timeControl: DEFAULT_TIME_CONTROL,
+  rated: true
 };
 
 /** The last choices made in the panel, remembered on this device. */
@@ -39,7 +43,8 @@ export function loadPrefs(storage: Storage | undefined = globalThis.localStorage
       timeControl:
         v.timeControl && Number.isFinite(v.timeControl.base) && Number.isFinite(v.timeControl.increment)
           ? { base: v.timeControl.base, increment: v.timeControl.increment }
-          : DEFAULT_PREFS.timeControl
+          : DEFAULT_PREFS.timeControl,
+      rated: typeof v.rated === 'boolean' ? v.rated : DEFAULT_PREFS.rated
     };
   } catch {
     return DEFAULT_PREFS;
