@@ -5,12 +5,14 @@ import { defineConfig, devices } from '@playwright/test';
  * archive) for a sub-path, served by a plain static server without COOP/COEP
  * (tools/serve-static.ts), so cross-origin isolation has to come from the service worker.
  * `pnpm test:static` builds into dist-static first; with DITHER_STATIC_DIR the test serves an
- * existing build instead.
+ * existing build instead (DITHER_STATIC_BASE: its base path), and with DITHER_STATIC_HEADERS set to
+ * a vercel.json the server sends that file's headers, as the website's host does.
  */
 const executablePath = process.env.DITHER_CHROMIUM || undefined;
-const base = `/${(process.env.DITHER_STATIC_BASE ?? 'dither').replace(/^\/+|\/+$/g, '')}/`;
+const base = `/${(process.env.DITHER_STATIC_BASE ?? 'dither').replace(/^\/+|\/+$/g, '')}/`.replace(/^\/\/$/, '/');
 const prebuilt = process.env.DITHER_STATIC_DIR;
-const serve = `node tools/serve-static.ts ${prebuilt ?? 'dist-static'} ${base} 4174`;
+const headers = process.env.DITHER_STATIC_HEADERS;
+const serve = `node tools/serve-static.ts ${prebuilt ?? 'dist-static'} ${base} 4174${headers ? ` ${headers}` : ''}`;
 
 export default defineConfig({
   testDir: 'tests/static',

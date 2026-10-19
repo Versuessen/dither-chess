@@ -4,16 +4,36 @@
  * so cross-origin isolation has to come from the app's service worker, as on any host that cannot
  * set headers.
  *
- *   node tools/serve-static.ts <dir> <base path> <port>
+ *   node tools/serve-static.ts <dir> <base path> <port> [vercel.json]
+ *
+ * With a vercel.json, its `headers` rules are applied as Vercel applies them (path patterns with
+ * `(.*)` groups), to check the website's own build and headers locally.
  */
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 
-const [dirArg = 'dist-static', baseArg = '/dither/', portArg = '4174'] = process.argv.slice(2);
+const [dirArg = 'dist-static', baseArg = '/dither/', portArg = '4174', vercelArg] = process.argv.slice(2);
 const dir = resolve(dirArg);
 const base = `/${baseArg.replace(/^\/+|\/+$/g, '')}/`.replace(/^\/\/$/, '/');
 const port = Number(portArg);
+
+interface HeaderRule {
+  source: string;
+  headers: { key: string; value: string }[];
+}
+const rules: { re: RegExp; headers: HeaderRule['headers'] }[] = vercelArg
+  ? (JSON.parse(readFileSync(vercelArg, 'utf8')) as { headers?: HeaderRule[] }).headers?.map((r) => ({
+      re: new RegExp(`^${r.source.split('(.*)').map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('(.*)')}$`),
+      headers: r.headers
+    })) ?? []
+  : [];
+
+/** Headers of every vercel.json rule that matches the path below the base. */
+function extraHeaders(path: string): Record<string, string> {
+  const site = `/${path.slice(base.length)}`;
+  return Object.fromEntries(rules.filter((r) => r.re.test(site)).flatMap((r) => r.headers.map((h) => [h.key, h.value])));
+}
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -31,7 +51,7 @@ const TYPES: Record<string, string> = {
 };
 
 createServer((req, res) => {
-  const url = new URL(req.url ?? '/', 'http://localhost');
+  const url = new URL(`http://localhost${(req.url ?? '/').replace(/^\/+/, '/')}`);
   const path = decodeURIComponent(url.pathname);
   if (path === base.slice(0, -1)) {
     res.writeHead(301, { Location: base + url.search });
@@ -59,7 +79,8 @@ createServer((req, res) => {
   const headers: Record<string, string | number> = {
     'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream',
     'Accept-Ranges': 'bytes',
-    'Cache-Control': 'max-age=600'
+    'Cache-Control': 'max-age=600',
+    ...extraHeaders(path)
   };
   const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range ?? '');
   if (range) {
