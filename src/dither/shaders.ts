@@ -55,6 +55,10 @@ uniform float uScreenB;       // screen of the outgoing subject
 uniform vec3 uAccent;         // opponent's accent for the light ink
 uniform float uAccentAmt;     // 0..1
 
+uniform sampler2D uLive;      // the live 3D piece (stage3d.ts): R lum, G coverage, rendered y-up
+uniform vec4 uLiveFit;        // screen uv -> live uv: xy scale, zw offset
+uniform float uLiveMix;       // 0 = the still subject, 1 = the live piece over the scene's background
+
 out vec4 outColor;
 
 float hash(vec2 p) {
@@ -103,6 +107,13 @@ float morphTone(vec2 uv) {
 // Tone of plane A (which 0) or B at a screen uv, after the tone curve and calm.
 float toneOf(int which, vec2 uv) {
   float t = which == 0 ? sceneTone(uSubjA, uFitA, uv) : sceneTone(uSubjB, uFitB, uv);
+  if (which == 0 && uLiveMix > 0.001) {
+    vec2 lu = uv * uLiveFit.xy + uLiveFit.zw;
+    float inBox = step(0.0, lu.x) * step(lu.x, 1.0) * step(0.0, lu.y) * step(lu.y, 1.0);
+    vec2 l = texture(uLive, vec2(lu.x, 1.0 - lu.y)).rg * inBox;
+    float bg = texture(uSubjA, uv * uFitA.xy + uFitA.zw + uBgOffset).b;
+    t = mix(t, mix(bg, l.x, l.y), uLiveMix);
+  }
   if (uMorphMix > 0.001) t = mix(t, morphTone(uv), uMorphMix);
   // Tone curve: let deep shadows go fully to the shadow ink and highlights fill the cell.
   t = pow(clamp((t - 0.07) / 0.86, 0.0, 1.0), 1.12);

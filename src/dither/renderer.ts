@@ -6,6 +6,8 @@
 import { FRAGMENT, VERTEX } from './shaders';
 import { KnightDrift, approach, coverFit, shouldRender, type Size } from './motion';
 import { toVec3 } from '../design/contrast';
+import { Stage3D } from './stage3d';
+import { SCENE_PIECE } from './pieces3d';
 
 export type DitherMode = 'black' | 'reveal' | 'live' | 'calm';
 
@@ -102,7 +104,10 @@ type UniformName =
   | 'uScreenA'
   | 'uScreenB'
   | 'uAccent'
-  | 'uAccentAmt';
+  | 'uAccentAmt'
+  | 'uLive'
+  | 'uLiveFit'
+  | 'uLiveMix';
 
 interface Tex {
   tex: WebGLTexture;
@@ -143,6 +148,10 @@ export class DitherRenderer {
   private accentTarget: Look['accent'] = null;
   private accentNow: [number, number, number] = [0, 0, 0];
   private accentAmt = 0;
+  private stage: Stage3D | null = null;
+  private vao: WebGLVertexArrayObject | null = null;
+  private currentId: string | null = null;
+  private liveMix = 0;
   private dissolveStart = -Infinity;
 
   private mode: DitherMode = 'black';
@@ -216,6 +225,7 @@ export class DitherRenderer {
     if (this.current === tex) return;
     this.previous = this.current ?? this.blank;
     this.current = tex;
+    this.currentId = id;
     const look = this.opts.looks?.[id];
     this.screenB = this.screenA;
     this.screenA = SCREEN_INDEX[look?.screen ?? 'lines'];
@@ -318,6 +328,7 @@ export class DitherRenderer {
     for (const t of this.textures.values()) gl.deleteTexture(t.tex);
     if (this.morph) gl.deleteTexture(this.morph.tex);
     if (this.blank) gl.deleteTexture(this.blank.tex);
+    this.stage?.dispose();
     if (this.program) gl.deleteProgram(this.program);
   }
 
@@ -344,7 +355,15 @@ export class DitherRenderer {
     this.program = p;
     gl.useProgram(p);
     this.uniforms.clear();
-    gl.bindVertexArray(gl.createVertexArray());
+    this.vao = gl.createVertexArray();
+    gl.bindVertexArray(this.vao);
+    // The live 3D piece is an extra: without it the still images are shown.
+    try {
+      this.stage = this.opts.still ? null : new Stage3D(gl);
+    } catch (err) {
+      console.warn('3D pieces disabled:', err);
+      this.stage = null;
+    }
     this.blank = this.makeTexture(new Uint8Array([0, 0, 0]), { width: 1, height: 1 }, [0.5, 0.5]);
     void this.loadMorph();
   }
@@ -477,6 +496,7 @@ export class DitherRenderer {
     const target = this.accentColour();
     for (let i = 0; i < 3; i++) this.accentNow[i] = approach(this.accentNow[i]!, target[i]!, dt, 0.12);
     this.accentAmt = approach(this.accentAmt, this.accentTarget === null ? 0 : ACCENT_AMOUNT, dt, 0.12);
+    this.liveMix = approach(this.liveMix, this.liveWanted() ? 1 : 0, dt, 0.12);
     // Full motion on the live home screen, a gentler version behind the game.
     const calm = this.mode === 'calm';
     const motion = live ? 1 : calm ? CALM_MOTION.parallax : 0;
@@ -488,6 +508,21 @@ export class DitherRenderer {
       this.phase += dt * PHASE_SPEED * (calm ? CALM_MOTION.phase : 1);
       if (!calm) this.frame = (this.frame + 1) % 4096;
     }
+  }
+
+  /** The home screen shows the hovered opponent's piece as a live 3D model. */
+  private liveWanted(): boolean {
+    return !!this.stage && this.mode === 'live' && !this.reducedMotion && !!this.currentId && this.currentId in SCENE_PIECE;
+  }
+
+  /** The piece's square on screen: right of centre on wide screens, upper middle on tall ones. */
+  private liveFit(W: number, H: number): [number, number, number, number] {
+    const tall = H > W;
+    const cx = tall ? 0.5 : 0.62;
+    const cy = tall ? 0.3 : 0.5;
+    const h = tall ? 0.55 : 0.98;
+    const w = (h * H) / W;
+    return [1 / w, 1 / h, 0.5 - cx / w, 0.5 - cy / h];
   }
 
   /** Nothing left to animate on a still or calm image. */
@@ -580,6 +615,27 @@ export class DitherRenderer {
     gl.uniform1f(this.u('uScreenB'), this.screenB);
     gl.uniform3f(this.u('uAccent'), ...this.accentNow);
     gl.uniform1f(this.u('uAccentAmt'), this.accentAmt);
+
+    // The live piece: it floats, twists slowly, and tilts towards the pointer.
+    const live = this.stage && this.liveMix > 0.001 && this.currentId ? SCENE_PIECE[this.currentId] : undefined;
+    if (live && this.stage && this.program) {
+      this.stage.render(
+        live,
+        {
+          yaw: -0.5 + t * 0.32 + this.pointerSmooth[0] * 0.7,
+          pitch: 0.1 + this.pointerSmooth[1] * 0.35 + Math.sin(t * 0.53) * 0.05,
+          roll: Math.sin(t * 0.41) * 0.07 - this.pointerSmooth[0] * 0.12,
+          lift: Math.sin(t * 0.9) * 0.035
+        },
+        { program: this.program, vao: this.vao }
+      );
+      gl.viewport(0, 0, W, H);
+    }
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, this.stage?.texture ?? this.blank!.tex);
+    gl.uniform1i(this.u('uLive'), 3);
+    gl.uniform4f(this.u('uLiveFit'), ...this.liveFit(W, H));
+    gl.uniform1f(this.u('uLiveMix'), live ? this.liveMix : 0);
 
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     this.opts.onFrame?.(now);
