@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { LOOKS } from '../bots/personas';
   import { onMount } from 'svelte';
   import { DitherRenderer, readInks } from './renderer';
   import { ART, ART_BASE } from './art';
@@ -24,7 +25,8 @@
         artBase: ART_BASE,
         reducedMotion: ui.reducedMotion,
         still: true,
-        inks: readInks()
+        inks: readInks(),
+        looks: LOOKS
       });
       renderer.setMode('live');
     } catch {

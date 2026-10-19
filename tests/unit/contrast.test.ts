@@ -57,6 +57,14 @@ describe('theme tokens meet WCAG AA', () => {
         expect(contrast(parseColor(t['button-ink']!), parseColor(t['button']!))).toBeGreaterThanOrEqual(AA_NORMAL);
       });
 
+      it("display list rows pass 3:1 over every opponent's accent", () => {
+        for (let i = 1; i <= 8; i++) {
+          const accent = parseColor(t[`accent-${i}`]!);
+          expect(contrast(parseColor(t['list-row']!), accent), `accent-${i}`).toBeGreaterThanOrEqual(AA_LARGE);
+          expect(contrast(parseColor(t['over-dither']!), accent), `accent-${i}`).toBeGreaterThanOrEqual(AA_LARGE);
+        }
+      });
+
       it('game review marks pass 4.5:1 on the panel', () => {
         const panel = parseColor(t['panel']!);
         for (const k of ['review-best', 'review-inaccuracy', 'review-mistake', 'review-blunder']) {

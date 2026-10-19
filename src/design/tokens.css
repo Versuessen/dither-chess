@@ -123,6 +123,17 @@
   --review-mistake: #b34d00;
   --review-blunder: #c2261b;
 
+  /* Opponents' accents for the dither light ink (light theme: light colours, so the dark list
+     text keeps 3:1 over them; checked in tests/unit/contrast.test.ts). */
+  --accent-1: #f4927a;
+  --accent-2: #8fe3b5;
+  --accent-3: #f6a7d6;
+  --accent-4: #cdee6a;
+  --accent-5: #86dcf3;
+  --accent-6: #f7f3e6;
+  --accent-7: #f7b25a;
+  --accent-8: #c6b4ff;
+
   --text-halo: none;
 }
 
@@ -161,6 +172,16 @@
   --review-mistake: #f28c38;
   --review-blunder: #ff6b5e;
 
+  /* Dark theme: deep colours, so the light list text keeps 3:1 over them. */
+  --accent-1: #b4371d;
+  --accent-2: #1d7c48;
+  --accent-3: #a52a6c;
+  --accent-4: #5f7313;
+  --accent-5: #0f6f8f;
+  --accent-6: #5a5a5a;
+  --accent-7: #a3520f;
+  --accent-8: #6a2bea;
+
   --text-halo: none;
 }
 
@@ -198,6 +219,16 @@
     --review-inaccuracy: #e8c547;
     --review-mistake: #f28c38;
     --review-blunder: #ff6b5e;
+
+    /* Dark theme: deep colours, so the light list text keeps 3:1 over them. */
+    --accent-1: #b4371d;
+    --accent-2: #1d7c48;
+    --accent-3: #a52a6c;
+    --accent-4: #5f7313;
+    --accent-5: #0f6f8f;
+    --accent-6: #5a5a5a;
+    --accent-7: #a3520f;
+    --accent-8: #6a2bea;
 
     --text-halo: none;
   }

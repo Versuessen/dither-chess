@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { DitherRenderer, readInks } from './renderer';
   import { ART, ART_BASE } from './art';
-  import { PERSONAS, HOME_SUBJECT } from '../bots/personas';
+  import { PERSONAS, HOME_SUBJECT, LOOKS } from '../bots/personas';
   import { ui } from '../app/ui.svelte';
   import { boot } from '../app/boot.svelte';
 
@@ -16,6 +16,7 @@
         artBase: ART_BASE,
         reducedMotion: ui.reducedMotion,
         inks: readInks(),
+        looks: LOOKS,
         // Frame counter for the end-to-end tests (reduced motion must not animate).
         onFrame: () => {
           (canvas as HTMLCanvasElement & { frames?: number }).frames =

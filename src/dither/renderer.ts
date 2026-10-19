@@ -27,7 +27,22 @@ export interface Inks {
   tint: [number, number, number];
   tintAmount: number;
   grain: number;
+  /** The opponents' accent colours (--accent-1 ...), in token order. */
+  accents: [number, number, number][];
 }
+
+/** How an image is screened: the default line screen, or one of the opponents' own. */
+export type Screen = 'lines' | 'dots' | 'mosaic' | 'dotted';
+const SCREEN_INDEX: Record<Screen, number> = { lines: 0, dots: 1, mosaic: 2, dotted: 3 };
+
+/** An opponent's look: its screen and accent (1-based index into Inks.accents, or null). */
+export interface Look {
+  screen: Screen;
+  accent: number | null;
+}
+
+export const ACCENT_COUNT = 8;
+const ACCENT_AMOUNT = 0.62;
 
 export function readInks(el: Element = document.documentElement): Inks {
   const cs = getComputedStyle(el);
@@ -38,7 +53,8 @@ export function readInks(el: Element = document.documentElement): Inks {
     bleed: toVec3(v('--dither-bleed')),
     tint: toVec3(v('--dither-tint')),
     tintAmount: Number(v('--dither-tint-amount')) || 0,
-    grain: Number(v('--dither-grain')) || 0.08
+    grain: Number(v('--dither-grain')) || 0.08,
+    accents: Array.from({ length: ACCENT_COUNT }, (_, i) => toVec3(v(`--accent-${i + 1}`) || '#000000'))
   };
 }
 
@@ -82,7 +98,11 @@ type UniformName =
   | 'uRippleWave'
   | 'uReveal'
   | 'uBlack'
-  | 'uCalm';
+  | 'uCalm'
+  | 'uScreenA'
+  | 'uScreenB'
+  | 'uAccent'
+  | 'uAccentAmt';
 
 interface Tex {
   tex: WebGLTexture;
@@ -102,6 +122,8 @@ export interface RendererOptions {
   still?: boolean;
   /** Called once per rendered frame (tests and the fps probe). */
   onFrame?: (now: number) => void;
+  /** Screen and accent per subject id; subjects not listed use the plain line screen. */
+  looks?: Record<string, Look>;
 }
 
 export class DitherRenderer {
@@ -116,6 +138,11 @@ export class DitherRenderer {
   private current: Tex | null = null;
   private previous: Tex | null = null;
   private wantedSubject: string | null = null;
+  private screenA = 0;
+  private screenB = 0;
+  private accentTarget: Look['accent'] = null;
+  private accentNow: [number, number, number] = [0, 0, 0];
+  private accentAmt = 0;
   private dissolveStart = -Infinity;
 
   private mode: DitherMode = 'black';
@@ -189,6 +216,12 @@ export class DitherRenderer {
     if (this.current === tex) return;
     this.previous = this.current ?? this.blank;
     this.current = tex;
+    const look = this.opts.looks?.[id];
+    this.screenB = this.screenA;
+    this.screenA = SCREEN_INDEX[look?.screen ?? 'lines'];
+    this.accentTarget = look?.accent ?? null;
+    if (this.accentTarget !== null && this.accentAmt < 0.01) this.accentNow = [...this.accentColour()];
+    if (instant || this.reducedMotion) this.settleAccent();
     this.dissolveStart = instant || this.reducedMotion || !this.previous ? -Infinity : performance.now();
     this.invalidate();
   }
@@ -233,7 +266,19 @@ export class DitherRenderer {
 
   setInks(inks: Inks): void {
     this.inks = inks;
+    this.settleAccent();
     this.invalidate();
+  }
+
+  private accentColour(): [number, number, number] {
+    const a = this.accentTarget;
+    return a === null ? this.accentNow : (this.inks.accents[a - 1] ?? this.accentNow);
+  }
+
+  /** Jump the accent to its target (no animation). */
+  private settleAccent(): void {
+    this.accentNow = [...this.accentColour()];
+    this.accentAmt = this.accentTarget === null ? 0 : ACCENT_AMOUNT;
   }
 
   setReducedMotion(on: boolean): void {
@@ -243,6 +288,7 @@ export class DitherRenderer {
       this.dissolveStart = -Infinity;
       this.morphMix = this.promotion ? 1 : 0;
       this.morphT = this.morphMix;
+      this.settleAccent();
     }
     this.invalidate();
   }
@@ -427,6 +473,10 @@ export class DitherRenderer {
     const on = this.promotion ? 1 : 0;
     this.morphMix = approach(this.morphMix, on, dt, 0.08);
     this.morphT = this.promotion ? Math.min(1, this.morphT + dt / 0.75) : Math.max(0, this.morphT - dt / 0.35);
+    // The accent follows the subject over about half a second.
+    const target = this.accentColour();
+    for (let i = 0; i < 3; i++) this.accentNow[i] = approach(this.accentNow[i]!, target[i]!, dt, 0.12);
+    this.accentAmt = approach(this.accentAmt, this.accentTarget === null ? 0 : ACCENT_AMOUNT, dt, 0.12);
     // Full motion on the live home screen, a gentler version behind the game.
     const calm = this.mode === 'calm';
     const motion = live ? 1 : calm ? CALM_MOTION.parallax : 0;
@@ -449,7 +499,8 @@ export class DitherRenderer {
       Math.abs(this.modeValues.black - this.modeTargets.black) > 0.002 ||
       Math.abs(this.modeValues.reveal - this.modeTargets.reveal) > 0.002 ||
       Math.abs(this.modeValues.calm - this.modeTargets.calm) > 0.002;
-    return !dissolving && !morphing && !blending;
+    const tinting = Math.abs(this.accentAmt - (this.accentTarget === null ? 0 : ACCENT_AMOUNT)) > 0.002;
+    return !dissolving && !morphing && !blending && !tinting;
   }
 
   private draw(now: number): void {
@@ -525,6 +576,10 @@ export class DitherRenderer {
     gl.uniform1f(this.u('uReveal'), this.modeValues.reveal);
     gl.uniform1f(this.u('uBlack'), this.modeValues.black);
     gl.uniform1f(this.u('uCalm'), this.modeValues.calm);
+    gl.uniform1f(this.u('uScreenA'), this.screenA);
+    gl.uniform1f(this.u('uScreenB'), this.screenB);
+    gl.uniform3f(this.u('uAccent'), ...this.accentNow);
+    gl.uniform1f(this.u('uAccentAmt'), this.accentAmt);
 
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     this.opts.onFrame?.(now);
