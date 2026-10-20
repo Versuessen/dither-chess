@@ -1,13 +1,15 @@
 /**
  * WebGL2 renderer for the dither layer. Owns the canvas, the textures and the frame loop;
- * reads its inks from the theme tokens. With reduced motion it renders one static frame
- * per state change: no parallax, no drift, frozen wave, instant swaps.
+ * reads its inks from the theme tokens. The opponents' scenes render live in 3D
+ * (liveScene.ts) where the machine keeps up; otherwise, and with reduced motion, the
+ * pre-rendered still images are shown. With reduced motion it renders one static frame per
+ * state change: no parallax, no drift, frozen wave, instant swaps.
  */
 import { VERTEX, fragmentSource, variantKey, type FragmentVariant } from './shaders';
 import { KnightDrift, approach, coverFit, shouldRender, type Size } from './motion';
 import { toVec3 } from '../design/contrast';
-import { Stage3D } from './stage3d';
-import { SCENE_PIECE } from './pieces3d';
+import { LiveScenes, type FieldAtlas } from './liveScene';
+import { sceneSpec } from './sceneSpecs';
 
 export type DitherMode = 'black' | 'reveal' | 'live' | 'calm';
 
@@ -34,8 +36,18 @@ export interface Inks {
 }
 
 /** How an image is screened: the default line screen, or one of the opponents' own. */
-export type Screen = 'lines' | 'dots' | 'mosaic' | 'dotted';
-const SCREEN_INDEX: Record<Screen, number> = { lines: 0, dots: 1, mosaic: 2, dotted: 3 };
+export type Screen = 'lines' | 'glyphs' | 'mosaic' | 'dotted';
+const SCREEN_INDEX: Record<Screen, number> = { lines: 0, glyphs: 1, mosaic: 2, dotted: 3 };
+
+/** True for CPU rasterisers (SwiftShader, llvmpipe and the like). */
+function softwareRenderer(gl: WebGL2RenderingContext): boolean {
+  const info = gl.getExtension('WEBGL_debug_renderer_info');
+  const name = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) ?? '');
+  return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+}
+
+/** The glyph screen's ramp, from no ink to the densest character. */
+const GLYPHS = [' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'];
 
 /** An opponent's look: its screen and accent (1-based index into Inks.accents, or null). */
 export interface Look {
@@ -70,8 +82,22 @@ const SUBJECT_PARALLAX = 0.014;
 const BG_PARALLAX = 0.005;
 const GRAIN_PARALLAX = 3;
 const DRIFT_STEP = 0.0042;
-/** The game backdrop keeps a slower, smaller version of the home screen's motion, at 30 fps. */
-const CALM_MOTION = { drift: 0.45, parallax: 0.55, phase: 0.35, fps: 30 } as const;
+/**
+ * Behind the game: a slower drift and wave, a stronger pointer parallax (the camera and the
+ * screen pattern both move), at 30 fps.
+ */
+const CALM_MOTION = { drift: 0.7, parallax: 1.4, phase: 0.5, fps: 30 } as const;
+/** The screen pattern's own movement, device px per unit of pointer, and its slow drift. */
+const SCREEN_PARALLAX = 26;
+const SCREEN_DRIFT = 9;
+/** Live scenes render at most this often, and at this share of the canvas height (max rows). */
+const SCENE_FPS = { live: 30, calm: 20 } as const;
+const SCENE_SCALE = 0.42;
+const SCENE_MAX_ROWS = 420;
+/** Frame time (ms, smoothed) above which live scenes give way to the stills on this machine. */
+const SLOW_FRAME_MS = 60;
+/** How long the first image waits for the live scenes before showing the still. */
+const FIELDS_WAIT_MS = 4000;
 
 type UniformName =
   | 'uRes'
@@ -103,9 +129,11 @@ type UniformName =
   | 'uCalm'
   | 'uAccent'
   | 'uAccentAmt'
-  | 'uLive'
-  | 'uLiveFit'
-  | 'uLiveMix';
+  | 'uGlyphs'
+  | 'uGlyphCount'
+  | 'uScreenOffset'
+  | 'uTime'
+  | 'uCellSize';
 
 interface Tex {
   tex: WebGLTexture;
@@ -118,11 +146,6 @@ export interface RendererOptions {
   artBase: string;
   reducedMotion: boolean;
   inks: Inks;
-  /**
-   * A still image (the profile portrait): no wave, parallax, drift or live grain, but
-   * user-triggered transitions (dissolve, promotion) still animate.
-   */
-  still?: boolean;
   /** Called once per rendered frame (tests and the fps probe). */
   onFrame?: (now: number) => void;
   /** Screen and accent per subject id; subjects not listed use the plain line screen. */
@@ -147,12 +170,20 @@ export class DitherRenderer {
   private accentTarget: Look['accent'] = null;
   private accentNow: [number, number, number] = [0, 0, 0];
   private accentAmt = 0;
-  private stage: Stage3D | null = null;
   private vao: WebGLVertexArrayObject | null = null;
-  private currentId: string | null = null;
-  private liveMix = 0;
-  private liveAllowed = false;
+  private glyphs: WebGLTexture | null = null;
   private dissolveStart = -Infinity;
+
+  /** Live 3D scenes: two render targets, the current subject's and the previous one's. */
+  private scenes: LiveScenes | null = null;
+  private fieldsWait: Promise<void> | null = null;
+  private sceneIds: [string | null, string | null] = [null, null];
+  private sceneSlot = 0;
+  private sceneLastRender = [0, 0];
+  private slowFrames = 0;
+  private verySlowFrames = 0;
+  private frameMs = 16;
+  private liveFailed = false;
 
   private mode: DitherMode = 'black';
   private modeValues = { black: 1, reveal: 0, calm: 0 };
@@ -220,12 +251,26 @@ export class DitherRenderer {
 
   async setSubject(id: string, instant = false): Promise<void> {
     this.wantedSubject = id;
-    const tex = await this.load(id);
-    if (this.disposed || this.wantedSubject !== id) return;
-    if (this.current === tex) return;
-    this.previous = this.current ?? this.blank;
-    this.current = tex;
-    this.currentId = id;
+    if (this.scenes && !this.scenes.ready && !this.liveFailed && !this.reducedMotion && sceneSpec(id)) {
+      await this.requestFields();
+      if (this.disposed || this.wantedSubject !== id) return;
+    }
+    if (this.liveOn() && sceneSpec(id)) {
+      // Live: the scene renders into the other target; the old one keeps rendering while it dissolves.
+      if (this.sceneIds[this.sceneSlot] === id) return;
+      this.sceneSlot = 1 - this.sceneSlot;
+      this.sceneIds[this.sceneSlot] = id;
+      this.sceneLastRender[this.sceneSlot] = 0;
+      this.previous = this.current ?? this.blank;
+      this.current = null;
+    } else {
+      const tex = await this.load(id);
+      if (this.disposed || this.wantedSubject !== id) return;
+      if (this.current === tex) return;
+      this.previous = this.current ?? this.blank;
+      this.current = tex;
+      this.sceneIds = [null, null];
+    }
     const look = this.opts.looks?.[id];
     this.screenB = this.screenA;
     this.screenA = SCREEN_INDEX[look?.screen ?? 'lines'];
@@ -248,8 +293,7 @@ export class DitherRenderer {
       reveal: mode === 'black' ? 0 : 1,
       calm: mode === 'calm' ? 1 : 0
     };
-    // Still images (the portrait) appear at once; only the full-screen layer fades and reveals.
-    if (this.reducedMotion || this.opts.still) this.modeValues = { ...this.modeTargets };
+    if (this.reducedMotion) this.modeValues = { ...this.modeTargets };
     this.invalidate();
   }
 
@@ -266,12 +310,6 @@ export class DitherRenderer {
   setPointer(x: number, y: number): void {
     this.pointer = [x, y];
     if (!this.reducedMotion) this.invalidate();
-  }
-
-  /** Whether the live 3D piece may show (the home screen only: elsewhere it would be hidden behind a panel). */
-  setLive3D(on: boolean): void {
-    this.liveAllowed = on;
-    this.invalidate();
   }
 
   /** Scroll progress of the roster in [0, 1]. */
@@ -306,6 +344,14 @@ export class DitherRenderer {
       this.morphT = this.morphMix;
       this.settleAccent();
     }
+    // Reduced motion shows the still images; without it the live scenes come back.
+    const live = this.sceneIds.some(Boolean);
+    if (this.wantedSubject && on && live) {
+      this.sceneIds = [null, null];
+      void this.setSubject(this.wantedSubject, true);
+    } else if (this.wantedSubject && !on && !live && this.scenes && !this.liveFailed) {
+      void this.setSubject(this.wantedSubject, true);
+    }
     this.invalidate();
   }
 
@@ -334,7 +380,8 @@ export class DitherRenderer {
     for (const t of this.textures.values()) gl.deleteTexture(t.tex);
     if (this.morph) gl.deleteTexture(this.morph.tex);
     if (this.blank) gl.deleteTexture(this.blank.tex);
-    this.stage?.dispose();
+    if (this.glyphs) gl.deleteTexture(this.glyphs);
+    this.scenes?.dispose();
     for (const e of this.programs.values()) gl.deleteProgram(e.program);
   }
 
@@ -344,16 +391,25 @@ export class DitherRenderer {
     const gl = this.gl;
     this.programs.clear();
     this.program = null;
-    this.use({ screenA: 0, screenB: null, live: false, morph: false });
+    this.use({ screenA: 0, screenB: null, morph: false, morphScreen: false });
     this.vao = gl.createVertexArray();
     gl.bindVertexArray(this.vao);
-    // The live 3D piece is an extra: without it the still images are shown.
-    try {
-      this.stage = this.opts.still ? null : new Stage3D(gl);
-    } catch (err) {
-      console.warn('3D pieces disabled:', err);
-      this.stage = null;
+    this.sceneIds = [null, null];
+    this.scenes = null;
+    this.fieldsWait = null;
+    // Live scenes are an extra: without them (or until their fields are ready) the stills show.
+    // A software renderer cannot trace them in real time, so it gets the stills from the start.
+    if (softwareRenderer(gl)) this.liveFailed = true;
+    if (!this.liveFailed) {
+      try {
+        this.scenes = new LiveScenes(gl);
+      } catch (err) {
+        console.warn('Live scenes disabled:', err);
+        this.liveFailed = true;
+      }
     }
+    this.makeGlyphs();
+    if (typeof document !== 'undefined' && document.fonts) void document.fonts.ready.then(() => !this.disposed && this.makeGlyphs());
     this.blank = this.makeTexture(new Uint8Array([0, 0, 0]), { width: 1, height: 1 }, [0.5, 0.5]);
     void this.loadMorph();
   }
@@ -493,15 +549,15 @@ export class DitherRenderer {
   private readonly tick = (now: number): void => {
     if (!this.running) return;
     this.raf = requestAnimationFrame(this.tick);
-    const calmFps = this.mode === 'calm' && !this.opts.still ? CALM_MOTION.fps : 60;
+    const calmFps = this.mode === 'calm' ? CALM_MOTION.fps : 60;
     if (!shouldRender(now, this.lastFrame, calmFps)) return;
+    const frameMs = now - this.lastFrame;
     this.lastFrame = now;
     const dt = Math.min(0.1, (now - this.lastTick) / 1000);
     this.lastTick = now;
     this.step(dt);
     this.draw(now);
-    // The portrait is a still image (as is everything with reduced motion): stop once transitions settle.
-    if (this.opts.still && this.settled(now)) this.stop();
+    if (frameMs < 1000) this.watchSpeed(now, frameMs);
   };
 
   private step(dt: number): void {
@@ -522,46 +578,114 @@ export class DitherRenderer {
     const target = this.accentColour();
     for (let i = 0; i < 3; i++) this.accentNow[i] = approach(this.accentNow[i]!, target[i]!, dt, 0.12);
     this.accentAmt = approach(this.accentAmt, this.accentTarget === null ? 0 : ACCENT_AMOUNT, dt, 0.12);
-    this.liveMix = approach(this.liveMix, this.liveWanted() ? 1 : 0, dt, 0.12);
     // Full motion on the live home screen, a gentler version behind the game.
     const calm = this.mode === 'calm';
     const motion = live ? 1 : calm ? CALM_MOTION.parallax : 0;
     this.pointerSmooth[0] = approach(this.pointerSmooth[0], this.pointer[0] * motion, dt, 0.25);
     this.pointerSmooth[1] = approach(this.pointerSmooth[1], this.pointer[1] * motion, dt, 0.25);
     this.scrollSmooth = approach(this.scrollSmooth, this.scroll * (live ? 1 : 0), dt, 0.2);
-    if (!this.opts.still) {
-      // Behind the game the wave moves slowly and the grain holds still.
-      this.phase += dt * PHASE_SPEED * (calm ? CALM_MOTION.phase : 1);
-      if (!calm) this.frame = (this.frame + 1) % 4096;
+    // Behind the game the wave moves slowly and the grain holds still.
+    this.phase += dt * PHASE_SPEED * (calm ? CALM_MOTION.phase : 1);
+    if (!calm) this.frame = (this.frame + 1) % 4096;
+  }
+
+  /** Live scenes are on: supported, fields ready, motion allowed, and the machine keeps up. */
+  private liveOn(): boolean {
+    if (!this.scenes || this.liveFailed || this.reducedMotion) return false;
+    return this.scenes.ready;
+  }
+
+  /**
+   * Start building the distance fields in a worker. Resolves once live scenes can render, or
+   * cannot (no worker, an error, or FIELDS_WAIT_MS passed), so the first image never flashes a
+   * still that the live scene then replaces.
+   */
+  private requestFields(): Promise<void> {
+    if (this.fieldsWait) return this.fieldsWait;
+    const scenes = this.scenes;
+    if (!scenes || typeof Worker === 'undefined') return Promise.resolve();
+    this.fieldsWait = new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, FIELDS_WAIT_MS);
+      const done = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      let w: Worker;
+      try {
+        w = new Worker(new URL('./fieldWorker.ts', import.meta.url), { type: 'module', name: 'dither-fields' });
+      } catch {
+        this.liveFailed = true;
+        done();
+        return;
+      }
+      w.onmessage = (e: MessageEvent<FieldAtlas>) => {
+        w.terminate();
+        if (!this.disposed && this.scenes === scenes) {
+          scenes.setFields(e.data);
+          // Arrived after the wait gave up: switch the still that is showing to its live scene.
+          if (this.wantedSubject && !this.sceneIds.some(Boolean)) void this.setSubject(this.wantedSubject, true);
+        }
+        done();
+      };
+      w.onerror = () => {
+        w.terminate();
+        this.liveFailed = true;
+        done();
+      };
+      w.postMessage(null);
+    });
+    return this.fieldsWait;
+  }
+
+  /** The glyph screen's characters, drawn once into a texture (again when the fonts load). */
+  private makeGlyphs(): void {
+    if (typeof document === 'undefined') return;
+    // Cells 5:8, as the shader's glyph cells.
+    const cw = 20;
+    const ch = 32;
+    const c = document.createElement('canvas');
+    c.width = cw * GLYPHS.length;
+    c.height = ch;
+    const g = c.getContext('2d');
+    if (!g) return;
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#fff';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = `30px "Departure Mono", ui-monospace, monospace`;
+    GLYPHS.forEach((chr, i) => g.fillText(chr, i * cw + cw / 2, ch / 2 + 1));
+    const gl = this.gl;
+    if (!this.glyphs) this.glyphs = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.glyphs);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.invalidate();
+  }
+
+  /**
+   * Machines that cannot keep up get the stills: when the smoothed frame time stays above
+   * SLOW_FRAME_MS for two seconds of live rendering (or three frames in a row take over 250 ms),
+   * live scenes stop for this session.
+   */
+  private watchSpeed(now: number, frameMs: number): void {
+    if (!this.sceneIds.some(Boolean)) return;
+    this.frameMs += (Math.min(frameMs, 250) - this.frameMs) * 0.1;
+    this.slowFrames = this.frameMs > SLOW_FRAME_MS ? this.slowFrames + frameMs : 0;
+    // Three frames in a row that take a quarter of a second are reason enough (one alone may
+    // be the page loading something); otherwise two slow seconds.
+    this.verySlowFrames = frameMs > 250 ? this.verySlowFrames + 1 : 0;
+    if (this.verySlowFrames >= 3 || (this.slowFrames > 2000 && now - this.startTime > 4000)) {
+      console.info(`Live scenes off: frames take ${Math.round(this.frameMs)} ms here; showing the still images.`);
+      this.liveFailed = true;
+      this.sceneIds = [null, null];
+      this.current = null;
+      if (this.wantedSubject) void this.setSubject(this.wantedSubject, true);
     }
-  }
-
-  /** The home screen shows the hovered opponent's piece as a live 3D model. */
-  private liveWanted(): boolean {
-    return !!this.stage && this.liveAllowed && this.mode === 'live' && !this.reducedMotion && !!this.currentId && this.currentId in SCENE_PIECE;
-  }
-
-  /** The piece's square on screen: right of centre on wide screens, upper middle on tall ones. */
-  private liveFit(W: number, H: number): [number, number, number, number] {
-    const tall = H > W;
-    const cx = tall ? 0.5 : 0.62;
-    const cy = tall ? 0.3 : 0.5;
-    const h = tall ? 0.55 : 0.98;
-    const w = (h * H) / W;
-    return [1 / w, 1 / h, 0.5 - cx / w, 0.5 - cy / h];
-  }
-
-  /** Nothing left to animate on a still or calm image. */
-  private settled(now: number): boolean {
-    const dissolving = now - this.dissolveStart < DISSOLVE_MS;
-    const target = this.promotion ? 1 : 0;
-    const morphing = Math.abs(this.morphMix - target) > 0.002 || Math.abs(this.morphT - target) > 0.002;
-    const blending =
-      Math.abs(this.modeValues.black - this.modeTargets.black) > 0.002 ||
-      Math.abs(this.modeValues.reveal - this.modeTargets.reveal) > 0.002 ||
-      Math.abs(this.modeValues.calm - this.modeTargets.calm) > 0.002;
-    const tinting = Math.abs(this.accentAmt - (this.accentTarget === null ? 0 : ACCENT_AMOUNT)) > 0.002;
-    return !dissolving && !morphing && !blending && !tinting;
   }
 
   private draw(now: number): void {
@@ -574,27 +698,62 @@ export class DitherRenderer {
     gl.viewport(0, 0, W, H);
     const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
     const view = { width: W, height: H };
-    const cur = this.current ?? this.blank!;
-    const prev = this.previous ?? this.blank!;
-    const fitA = coverFit(cur.size, view, cur.focal);
-    const fitB = coverFit(prev.size, view, prev.focal);
+    const t = (now - this.startTime) / 1000;
     const dissolve = Math.min(1, Math.max(0, (now - this.dissolveStart) / DISSOLVE_MS));
     if (dissolve < 1) this.dirty = true;
-    const livePiece = this.stage && this.liveMix > 0.001 && this.currentId ? SCENE_PIECE[this.currentId] : undefined;
+
+    // Live scenes: render the current one (and the previous one while it dissolves) at their own pace.
+    let cur = this.current ?? this.blank!;
+    let prev = this.previous ?? this.blank!;
+    if (this.scenes?.ready && this.sceneIds[this.sceneSlot] && !this.liveFailed) {
+      const rows = Math.min(SCENE_MAX_ROWS, H * SCENE_SCALE);
+      const fps = this.mode === 'calm' ? SCENE_FPS.calm : SCENE_FPS.live;
+      const calm = this.mode === 'calm';
+      for (const slot of [this.sceneSlot, 1 - this.sceneSlot]) {
+        const id = this.sceneIds[slot];
+        const spec = id ? sceneSpec(id) : undefined;
+        if (!spec) continue;
+        const isCurrent = slot === this.sceneSlot;
+        if (!isCurrent && dissolve >= 1) continue;
+        const tex = this.scenes.target(slot, rows);
+        if (now - this.sceneLastRender[slot]! >= 1000 / fps - 1.5) {
+          this.sceneLastRender[slot] = now;
+          this.scenes.render(
+            slot,
+            spec,
+            { time: t, pointer: this.pointerSmooth, parallax: calm ? CALM_MOTION.parallax : 1, turn: calm ? 0.6 : 1 },
+            { program: this.program, vao: this.vao }
+          );
+          gl.viewport(0, 0, W, H);
+        }
+        const live = { tex, size: this.scenes.size(slot), focal: spec.focal };
+        if (isCurrent) cur = live;
+        else prev = live;
+      }
+    }
+    const fitA = coverFit(cur.size, view, cur.focal);
+    const fitB = coverFit(prev.size, view, prev.focal);
+    const morphScreen = this.mode === 'calm' && !this.reducedMotion;
     this.use({
       screenA: this.screenA,
       screenB: dissolve < 1 ? this.screenB : null,
-      live: !!livePiece,
-      morph: !!this.morph && this.morphMix > 0.001
+      morph: !!this.morph && this.morphMix > 0.001,
+      morphScreen
     });
 
-    const still = this.reducedMotion || this.opts.still === true;
-    const t = (now - this.startTime) / 1000;
+    const still = this.reducedMotion;
     const driftScale = this.mode === 'calm' ? CALM_MOTION.drift : 1;
-    const [dx, dy] = still ? [0, 0] : this.drift.at(t).map((v) => v * driftScale) as [number, number];
+    const [dx, dy] = still ? [0, 0] : (this.drift.at(t).map((v) => v * driftScale) as [number, number]);
     const px = still ? 0 : this.pointerSmooth[0];
     const py = still ? 0 : this.pointerSmooth[1];
     const sy = still ? 0 : (this.scrollSmooth - 0.5) * 0.02;
+    // The screen pattern itself moves: with the pointer, and slowly on its own.
+    const screenOffset: [number, number] = still
+      ? [0, 0]
+      : [
+          (px * SCREEN_PARALLAX + Math.sin(t * 0.07) * SCREEN_DRIFT) * dpr * (this.mode === 'calm' ? 1 : 0.5),
+          (py * SCREEN_PARALLAX + Math.cos(t * 0.05) * SCREEN_DRIFT) * dpr * (this.mode === 'calm' ? 1 : 0.5)
+        ];
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, cur.tex);
@@ -612,8 +771,8 @@ export class DitherRenderer {
     gl.uniform1f(this.u('uMorphMix'), this.morph ? this.morphMix : 0);
 
     gl.uniform2f(this.u('uRes'), W, H);
-    gl.uniform1f(this.u('uPhase'), this.reducedMotion || this.opts.still ? 0.8 : this.phase);
-    gl.uniform1f(this.u('uFrame'), this.reducedMotion || this.opts.still ? 0 : this.frame);
+    gl.uniform1f(this.u('uPhase'), this.reducedMotion ? 0.8 : this.phase);
+    gl.uniform1f(this.u('uFrame'), this.reducedMotion ? 0 : this.frame);
     gl.uniform4f(this.u('uFitA'), ...fitA);
     gl.uniform4f(this.u('uFitB'), ...fitB);
     gl.uniform1f(this.u('uDissolve'), dissolve);
@@ -647,26 +806,13 @@ export class DitherRenderer {
     gl.uniform3f(this.u('uAccent'), ...this.accentNow);
     gl.uniform1f(this.u('uAccentAmt'), this.accentAmt);
 
-    // The live piece: it floats, twists slowly, and tilts towards the pointer.
-    const live = livePiece;
-    if (live && this.stage && this.program) {
-      this.stage.render(
-        live,
-        {
-          yaw: -0.5 + t * 0.32 + this.pointerSmooth[0] * 0.7,
-          pitch: 0.1 + this.pointerSmooth[1] * 0.35 + Math.sin(t * 0.53) * 0.05,
-          roll: Math.sin(t * 0.41) * 0.07 - this.pointerSmooth[0] * 0.12,
-          lift: Math.sin(t * 0.9) * 0.035
-        },
-        { program: this.program, vao: this.vao }
-      );
-      gl.viewport(0, 0, W, H);
-    }
     gl.activeTexture(gl.TEXTURE3);
-    gl.bindTexture(gl.TEXTURE_2D, this.stage?.texture ?? this.blank!.tex);
-    gl.uniform1i(this.u('uLive'), 3);
-    gl.uniform4f(this.u('uLiveFit'), ...this.liveFit(W, H));
-    gl.uniform1f(this.u('uLiveMix'), live ? this.liveMix : 0);
+    gl.bindTexture(gl.TEXTURE_2D, this.glyphs ?? this.blank!.tex);
+    gl.uniform1i(this.u('uGlyphs'), 3);
+    gl.uniform1f(this.u('uGlyphCount'), GLYPHS.length);
+    gl.uniform2f(this.u('uScreenOffset'), ...screenOffset);
+    gl.uniform1f(this.u('uTime'), still ? 0 : t);
+    gl.uniform1f(this.u('uCellSize'), Math.max(W, H) / 3.2);
 
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     this.opts.onFrame?.(now);

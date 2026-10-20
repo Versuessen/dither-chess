@@ -1,7 +1,7 @@
 /**
- * The dither layer: luminance -> a screen (rippled horizontal lines by default; halftone dots,
- * pixel mosaic or dotted lines for some opponents) -> duotone with an optional accent -> hash
- * grain. One full-screen triangle, three textures (current subject, previous subject,
+ * The dither layer: luminance -> a screen (rippled horizontal lines by default; ASCII glyphs, a
+ * pixel mosaic or dotted lines for some opponents; behind the game, all of them morphing across
+ * drifting Voronoi cells) -> duotone with an optional accent -> hash grain. One full-screen triangle, three textures (current subject, previous subject,
  * promotion atlas). All coordinates in device pixels unless noted.
  */
 
@@ -51,15 +51,18 @@ uniform float uBlack;         // 0..1 fade to grain-on-black (preloader)
 uniform float uCalm;          // 0..1 game-screen calm
 
 // Compiled per variant (fragmentSource): SCREEN_A / SCREEN_B are the screens of the incoming and
-// outgoing subjects (0 lines, 1 dots, 2 mosaic, 3 dotted lines); DISSOLVE, LIVE and MORPH switch
-// on the code for a running dissolve, the live 3D piece and the promotion morph. Constant screens
-// let the compiler drop the unused patterns, which software renderers cannot do for uniforms.
+// outgoing subjects (0 lines, 1 glyphs, 2 mosaic, 3 dotted lines); DISSOLVE and MORPH switch on
+// the code for a running dissolve and the promotion morph; MORPHSCREEN replaces the fixed screens
+// by the morphing Voronoi field. Constant screens let the compiler drop the unused patterns,
+// which software renderers cannot do for uniforms.
 uniform vec3 uAccent;         // opponent's accent for the light ink
 uniform float uAccentAmt;     // 0..1
 
-uniform sampler2D uLive;      // the live 3D piece (stage3d.ts): R lum, G coverage, rendered y-up
-uniform vec4 uLiveFit;        // screen uv -> live uv: xy scale, zw offset
-uniform float uLiveMix;       // 0 = the still subject, 1 = the live piece over the scene's background
+uniform sampler2D uGlyphs;    // glyph ramp, light to dark ink, in one row of square cells
+uniform float uGlyphCount;
+uniform vec2 uScreenOffset;   // the screen pattern's own drift and parallax, device px
+uniform float uTime;          // seconds, for the morphing screen
+uniform float uCellSize;      // Voronoi cell size of the morphing screen, device px
 
 out vec4 outColor;
 
@@ -112,23 +115,13 @@ float toneOf(int which, vec2 uv) {
   float t;
   if (which == 0) t = sceneTone(uSubjA, uFitA, uv);
   else t = sceneTone(uSubjB, uFitB, uv);
-#if LIVE
-  if (which == 0) {
-    vec2 lu = uv * uLiveFit.xy + uLiveFit.zw;
-    float inBox = step(0.0, lu.x) * step(lu.x, 1.0) * step(0.0, lu.y) * step(lu.y, 1.0);
-    vec2 l = texture(uLive, vec2(lu.x, 1.0 - lu.y)).rg * inBox;
-    float bg = texture(uSubjA, uv * uFitA.xy + uFitA.zw + uBgOffset).b;
-    t = mix(t, mix(bg, l.x, l.y), uLiveMix);
-  }
-#endif
-
 #if MORPH
   t = mix(t, morphTone(uv), uMorphMix);
 #endif
   // Tone curve: let deep shadows go fully to the shadow ink and highlights fill the cell.
   t = pow(clamp((t - 0.07) / 0.86, 0.0, 1.0), 1.12);
-  // Calm: compress the tone range so the image recedes behind the board.
-  return 0.42 + (t - 0.42) * (1.0 - 0.62 * uCalm);
+  // Calm: compress the tone range a little so the image sits behind the board.
+  return 0.42 + (t - 0.42) * (1.0 - 0.35 * uCalm);
 }
 
 // 4x4 ordered-dither threshold.
@@ -140,51 +133,91 @@ float bayer4(vec2 p) {
 
 // Coverage of the light ink for one plane on its screen; also its tone, and the mark's half
 // width and the distance from its axis (for the tint in the cores of the brightest marks).
+// The pattern lives at fc + uScreenOffset, so it can drift; the image is sampled where it is.
 float cover(float screen, int which, vec2 fc, float ripple, float g1, float grainAmt, float reveal,
             out float t, out float w, out float dist) {
   const float aa = 0.85;
+  vec2 q = fc + uScreenOffset;
   if (screen < 0.5) {
     // Lines: one horizontal line per period, as wide as the tone.
-    float yw = fc.y + ripple;
+    float yw = q.y + ripple;
     float centre = (floor(yw / uPeriod) + 0.5) * uPeriod;
     dist = abs(yw - centre);
     // Sample the image at the line centre so each line is symmetric around its axis.
-    t = toneOf(which, vec2(fc.x, centre - ripple) / uRes);
+    t = toneOf(which, vec2(fc.x, centre - ripple - uScreenOffset.y) / uRes);
     w = 0.5 * uPeriod * clamp(t + (g1 - 0.5) * grainAmt, 0.0, 1.0) * reveal;
     return smoothstep(w + aa, w - aa, dist) * step(0.02, w);
   }
   if (screen < 1.5) {
-    // Halftone dots on a staggered grid, rippled like the lines.
-    float cell = uPeriod * 2.1;
-    vec2 q = vec2(fc.x, fc.y + ripple);
-    float row = floor(q.y / cell);
-    float shift = mod(row, 2.0) * 0.5 * cell;
-    vec2 c = vec2((floor((q.x + shift) / cell) + 0.5) * cell - shift, (row + 0.5) * cell);
-    t = toneOf(which, vec2(c.x, c.y - ripple) / uRes);
-    w = cell * 0.66 * sqrt(clamp(t + (g1 - 0.5) * grainAmt * 0.5, 0.0, 1.0)) * reveal;
-    dist = length(q - c);
-    return smoothstep(w + aa, w - aa, dist) * step(0.04 * cell, w);
+    // Glyphs: an ASCII ramp, one character per cell (a monospace cell, taller than wide),
+    // denser characters for brighter tone.
+    vec2 cell = vec2(uPeriod * 2.5, uPeriod * 4.0);
+    vec2 qq = vec2(q.x, q.y + ripple * 0.5);
+    vec2 c = (floor(qq / cell) + 0.5) * cell;
+    t = toneOf(which, (c - vec2(0.0, ripple * 0.5) - uScreenOffset) / uRes);
+    float level = clamp(t + (g1 - 0.5) * grainAmt * 0.3, 0.0, 1.0) * reveal;
+    float k = floor(level * (uGlyphCount - 0.001));
+    vec2 local = (qq - (c - 0.5 * cell)) / cell;
+    float ink = texture(uGlyphs, vec2((k + local.x) / uGlyphCount, local.y)).r;
+    w = 1.0;
+    dist = 1.0;
+    return smoothstep(0.35, 0.65, ink);
   }
   if (screen < 2.5) {
     // Pixel mosaic: the image in square blocks, each filled with a 4x4 ordered dither.
     float block = uPeriod * 4.0;
-    vec2 c = (floor(fc / block) + 0.5) * block;
-    t = toneOf(which, c / uRes);
+    vec2 c = (floor(q / block) + 0.5) * block;
+    t = toneOf(which, (c - uScreenOffset) / uRes);
     w = 1.0;
     dist = 1.0;
     float level = clamp(t + (g1 - 0.5) * grainAmt * 0.25, 0.0, 1.0) * reveal;
-    return step(bayer4(fc / (block * 0.25)), level);
+    return step(bayer4(q / (block * 0.25)), level);
   }
   // Dotted lines: the line screen broken into round dots, like trailing particles.
-  float yw = fc.y + ripple;
-  float centre = (floor(yw / uPeriod / 1.5) + 0.5) * uPeriod * 1.5;
   float sp = uPeriod * 1.5;
-  float cx = (floor(fc.x / sp) + 0.5) * sp;
-  t = toneOf(which, vec2(cx, centre - ripple) / uRes);
+  float yw = q.y + ripple;
+  float centre = (floor(yw / sp) + 0.5) * sp;
+  float cx = (floor(q.x / sp) + 0.5) * sp;
+  t = toneOf(which, (vec2(cx, centre - ripple) - uScreenOffset) / uRes);
   w = 0.5 * sp * sqrt(clamp(t + (g1 - 0.5) * grainAmt, 0.0, 1.0)) * reveal;
-  dist = length(vec2(fc.x - cx, yw - centre));
+  dist = length(vec2(q.x - cx, yw - centre));
   return smoothstep(w + aa, w - aa, dist) * step(0.04 * sp, w);
 }
+
+#if MORPHSCREEN
+vec2 hash2(vec2 p) {
+  return vec2(hash(p * 1.0 + 3.1), hash(p * 1.7 + 11.3));
+}
+
+// The morphing screen behind the game: drifting Voronoi cells, each showing one screen, which
+// it hands on to the next every few seconds through a pixel-by-pixel threshold dissolve.
+float morphScreen(vec2 fc) {
+  vec2 g = fc / uCellSize;
+  vec2 ip = floor(g);
+  float best = 1e9;
+  vec2 bestId = ip;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 id = ip + vec2(float(x), float(y));
+      vec2 h = hash2(id);
+      vec2 seed = id + 0.5 + 0.38 * sin(uTime * vec2(0.09, 0.07) + 6.2831853 * h);
+      float d = length(g - seed);
+      if (d < best) {
+        best = d;
+        bestId = id;
+      }
+    }
+  }
+  float h = hash(bestId + 7.0);
+  float cyc = uTime / 11.0 + h * 4.0;
+  float k = floor(cyc);
+  float f = fract(cyc);
+  float s0 = mod(k + floor(h * 4.0), 4.0);
+  float s1 = mod(s0 + 1.0, 4.0);
+  float n = hash(floor(fc / (uPeriod * 2.0)) + bestId * 13.0);
+  return f > 0.8 && n < (f - 0.8) / 0.2 ? s1 : s0;
+}
+#endif
 
 void main() {
   vec2 fc = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
@@ -192,9 +225,10 @@ void main() {
 
   // ---- line screen geometry -------------------------------------------------------------
   // The ripple amplitude itself varies along x, so edges shimmer like a vibrating engraving.
-  float ampMod = 0.55 + 0.45 * sin(fc.x * 0.0023 + uPhase * 0.61 + sin(fc.y * 0.0031 + uPhase * 0.2));
-  float ripple = uRippleAmp * ampMod * sin(6.2831853 * fc.x / uRippleWave + uPhase);
-  float line = floor((fc.y + ripple) / uPeriod);
+  vec2 q = fc + uScreenOffset;
+  float ampMod = 0.55 + 0.45 * sin(q.x * 0.0023 + uPhase * 0.61 + sin(q.y * 0.0031 + uPhase * 0.2));
+  float ripple = uRippleAmp * ampMod * sin(6.2831853 * q.x / uRippleWave + uPhase);
+  float line = floor((q.y + ripple) / uPeriod);
 
   // ---- grain -----------------------------------------------------------------------------
   vec2 gp = fc + uGrainOffset;
@@ -204,18 +238,24 @@ void main() {
   float revealLine = clamp(uReveal * 1.6 - hash(vec2(line, 5.0)) * 0.6, 0.0, 1.0);
 
   // ---- coverage of both planes -----------------------------------------------------------
-  // Uniform branch: the outgoing image costs nothing at rest.
+#if MORPHSCREEN
+  float screenA = morphScreen(fc);
+  float screenB = screenA;
+#else
+  float screenA = float(SCREEN_A);
+  float screenB = float(SCREEN_B);
+#endif
   float tA, wA, dA, tB, wB, dB;
-  float covA = cover(float(SCREEN_A), 0, fc, ripple, g1, grainAmt, revealLine, tA, wA, dA);
+  float covA = cover(screenA, 0, fc, ripple, g1, grainAmt, revealLine, tA, wA, dA);
   float covB = covA;
   tB = tA; wB = wA; dB = dA;
 #if DISSOLVE
-  covB = cover(float(SCREEN_B), 1, fc, ripple, g1, grainAmt, revealLine, tB, wB, dB);
+  covB = cover(screenB, 1, fc, ripple, g1, grainAmt, revealLine, tB, wB, dB);
 #endif
 
   // ---- segment-wise threshold dissolve ------------------------------------------------------
   float segLen = uPeriod * (6.0 + 10.0 * hash(vec2(line, 91.0)));
-  float seg = floor((fc.x + hash(vec2(line, 13.0)) * segLen) / segLen);
+  float seg = floor((q.x + hash(vec2(line, 13.0)) * segLen) / segLen);
   float n = hash(vec2(seg, line));
   float p = clamp((uDissolve - n * 0.6) / 0.4, 0.0, 1.0);
   // Old marks thin and break first, new marks then form segment by segment.
@@ -249,12 +289,13 @@ export interface FragmentVariant {
   screenA: number;
   /** null when no dissolve is running. */
   screenB: number | null;
-  live: boolean;
   morph: boolean;
+  /** The morphing Voronoi screen (behind the game) instead of the fixed screens. */
+  morphScreen: boolean;
 }
 
 export function variantKey(v: FragmentVariant): string {
-  return `${v.screenA}${v.screenB ?? '-'}${v.live ? 'L' : ''}${v.morph ? 'M' : ''}`;
+  return `${v.screenA}${v.screenB ?? '-'}${v.morph ? 'M' : ''}${v.morphScreen ? 'V' : ''}`;
 }
 
 export function fragmentSource(v: FragmentVariant): string {
@@ -262,8 +303,8 @@ export function fragmentSource(v: FragmentVariant): string {
     `#define SCREEN_A ${v.screenA}`,
     `#define SCREEN_B ${v.screenB ?? v.screenA}`,
     `#define DISSOLVE ${v.screenB === null ? 0 : 1}`,
-    `#define LIVE ${v.live ? 1 : 0}`,
-    `#define MORPH ${v.morph ? 1 : 0}`
+    `#define MORPH ${v.morph ? 1 : 0}`,
+    `#define MORPHSCREEN ${v.morphScreen ? 1 : 0}`
   ].join('\n');
   return FRAGMENT.replace('#version 300 es\n', `#version 300 es\n${defines}\n`);
 }

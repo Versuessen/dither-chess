@@ -62,22 +62,6 @@ export function plane(y0: number): SDF {
   return (_x, y) => y - y0;
 }
 
-/** Chaikin corner cutting; endpoints stay fixed. Repeating a control point keeps a corner sharp. */
-export function chaikin(points: [number, number][], iterations: number): [number, number][] {
-  let pts = points;
-  for (let it = 0; it < iterations; it++) {
-    const out: [number, number][] = [pts[0]!];
-    for (let i = 0; i < pts.length - 1; i++) {
-      const [ax, ay] = pts[i]!;
-      const [bx, by] = pts[i + 1]!;
-      out.push([0.75 * ax + 0.25 * bx, 0.75 * ay + 0.25 * by]);
-      out.push([0.25 * ax + 0.75 * bx, 0.25 * ay + 0.75 * by]);
-    }
-    out.push(pts[pts.length - 1]!);
-    pts = out;
-  }
-  return pts;
-}
 
 /**
  * Signed distance to a closed 2D polygon (array of [u, v]), negative inside.

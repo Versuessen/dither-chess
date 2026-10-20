@@ -1,11 +1,10 @@
 /**
- * Staunton-style chess pieces as signed distance fields. Units: a pawn base has radius 1.
- * Profiles are [radius, height] control polygons smoothed with Chaikin; repeated points
- * keep a crease.
+ * Staunton-style chess pieces as signed distance fields, for the offline still images. The
+ * profiles are shared with the live renderer (src/dither/pieceProfiles.ts); the cuts and added
+ * parts here have their GLSL twins in src/dither/liveScene.ts. Units: a pawn base has radius 1.
  */
 import {
   type SDF,
-  chaikin,
   cylinder,
   ellipsoid,
   extrudeZY,
@@ -16,52 +15,17 @@ import {
   smin,
   sphere
 } from './sdf.ts';
-
-type P = [number, number];
-
-/** Shared foot: a rounded base disc with a bead and a cove, ending at the stem. */
-function foot(r: number, stemTop: P): P[] {
-  return [
-    [0, 0],
-    [r * 0.97, 0],
-    [r, 0.03],
-    [r, 0.12],
-    [r * 0.96, 0.17],
-    [r * 0.86, 0.2],
-    [r * 0.86, 0.2],
-    [r * 0.9, 0.27],
-    [r * 0.84, 0.34],
-    [r * 0.7, 0.38],
-    [r * 0.7, 0.38],
-    [r * 0.62, 0.46],
-    [r * 0.48, 0.62],
-    stemTop
-  ];
-}
-
-function closeToAxis(points: P[]): P[] {
-  const last = points[points.length - 1]!;
-  return [...points, [0, last[1]]];
-}
-
-export function pawnProfile(): P[] {
-  return closeToAxis(
-    chaikin(
-      [
-        ...foot(1, [0.4, 1.0]),
-        [0.34, 1.38],
-        [0.36, 1.45],
-        [0.58, 1.5],
-        [0.62, 1.56],
-        [0.57, 1.63],
-        [0.36, 1.66],
-        [0.36, 1.66],
-        [0.3, 1.74]
-      ],
-      3
-    )
-  );
-}
+import {
+  KNIGHT_HEAD,
+  KNIGHT_ROUND,
+  bishopProfile,
+  kingProfile,
+  knightBaseProfile,
+  knightHalfThickness,
+  pawnProfile,
+  queenProfile,
+  rookProfile
+} from '../../src/dither/pieceProfiles.ts';
 
 export function pawn(): SDF {
   const body = lathe(pawnProfile());
@@ -70,27 +34,7 @@ export function pawn(): SDF {
 }
 
 export function rook(): SDF {
-  const body = lathe(
-    closeToAxis(
-      chaikin(
-        [
-          ...foot(1.08, [0.62, 0.9]),
-          [0.56, 1.5],
-          [0.58, 1.8],
-          [0.7, 1.86],
-          [0.74, 1.92],
-          [0.7, 1.98],
-          [0.66, 2.02],
-          [0.72, 2.12],
-          [0.76, 2.2],
-          [0.76, 2.62],
-          [0.76, 2.62],
-          [0.72, 2.66]
-        ],
-        3
-      )
-    )
-  );
+  const body = lathe(rookProfile());
   const hollow = cylinder(0, 0, 0.52, 2.38, 3.0);
   const slots: SDF[] = [];
   for (let i = 0; i < 4; i++) {
@@ -106,25 +50,6 @@ export function rook(): SDF {
     for (const sl of slots) d = smax(d, -sl(x, y, z), 0.02);
     return d;
   };
-}
-
-export function bishopProfile(): P[] {
-  return closeToAxis(
-    chaikin(
-      [
-        ...foot(1.02, [0.42, 1.0]),
-        [0.33, 1.7],
-        [0.36, 1.82],
-        [0.62, 1.88],
-        [0.66, 1.94],
-        [0.6, 2.0],
-        [0.38, 2.03],
-        [0.38, 2.03],
-        [0.42, 2.12]
-      ],
-      3
-    )
-  );
 }
 
 export function bishop(): SDF {
@@ -150,31 +75,6 @@ export function bishop(): SDF {
   };
 }
 
-export function queenProfile(): P[] {
-  return closeToAxis(
-    chaikin(
-      [
-        ...foot(1.15, [0.48, 1.05]),
-        [0.36, 2.2],
-        [0.36, 2.4],
-        [0.66, 2.48],
-        [0.7, 2.55],
-        [0.62, 2.62],
-        [0.42, 2.66],
-        [0.42, 2.66],
-        [0.44, 2.75],
-        [0.58, 3.0],
-        [0.72, 3.22],
-        [0.74, 3.28],
-        [0.6, 3.3],
-        [0.6, 3.3],
-        [0.5, 3.36]
-      ],
-      3
-    )
-  );
-}
-
 export function queen(): SDF {
   const body = lathe(queenProfile());
   const dome = ellipsoid(0, 3.36, 0, 0.5, 0.26, 0.5);
@@ -192,33 +92,7 @@ export function queen(): SDF {
 }
 
 export function king(): SDF {
-  const body = lathe(
-    closeToAxis(
-      chaikin(
-        [
-          ...foot(1.18, [0.5, 1.08]),
-          [0.38, 2.36],
-          [0.38, 2.56],
-          [0.68, 2.64],
-          [0.72, 2.71],
-          [0.64, 2.78],
-          [0.44, 2.82],
-          [0.44, 2.82],
-          [0.46, 2.9],
-          [0.62, 3.2],
-          [0.7, 3.42],
-          [0.7, 3.46],
-          [0.56, 3.5],
-          [0.56, 3.5],
-          [0.46, 3.62],
-          [0.2, 3.72],
-          [0.2, 3.72],
-          [0.14, 3.8]
-        ],
-        3
-      )
-    )
-  );
+  const body = lathe(kingProfile());
   const upright = roundBox(0, 4.12, 0, 0.1, 0.36, 0.1, 0.03);
   const bar = roundBox(0, 4.18, 0, 0.3, 0.1, 0.1, 0.03);
   return (x, y, z) => {
@@ -227,59 +101,9 @@ export function king(): SDF {
   };
 }
 
-/** Knight head silhouette in the (z, y) plane, snout towards +z. */
-const KNIGHT_HEAD: P[] = chaikin(
-  [
-    [-0.72, 1.0],
-    [-0.8, 1.45],
-    [-0.88, 1.9],
-    [-0.84, 2.3],
-    [-0.7, 2.66],
-    [-0.5, 2.94],
-    [-0.42, 3.1],
-    [-0.36, 3.42],
-    [-0.36, 3.42],
-    [-0.18, 3.16],
-    [-0.18, 3.16],
-    [0.06, 3.14],
-    [0.34, 3.0],
-    [0.62, 2.78],
-    [0.88, 2.5],
-    [1.06, 2.3],
-    [1.16, 2.12],
-    [1.16, 2.12],
-    [1.16, 1.96],
-    [1.06, 1.86],
-    [1.06, 1.86],
-    [0.86, 1.86],
-    [0.62, 1.92],
-    [0.46, 1.98],
-    [0.46, 1.98],
-    [0.38, 1.82],
-    [0.44, 1.58],
-    [0.6, 1.36],
-    [0.64, 1.0]
-  ],
-  2
-);
-
 export function knight(): SDF {
-  const base = lathe(
-    closeToAxis(chaikin([...foot(1.12, [0.78, 0.72]), [0.8, 0.82], [0.8, 0.82], [0.7, 0.9], [0.7, 1.05]], 3))
-  );
-  // C1 ramps so the taper never creases the surface.
-  const ramp = (v: number, k: number) => (v > 0 ? (v * v) / (v + k) : 0);
-  const head = extrudeZY(
-    KNIGHT_HEAD,
-    (z, y) => {
-      // Broad at the neck and cheek, narrower at the muzzle and the top of the head.
-      const muzzle = 0.16 * ramp(z - 0.15, 0.35);
-      const crown = 0.22 * ramp(y - 2.55, 0.25);
-      const cheek = 0.06 * Math.exp(-((y - 2.35) ** 2) / 0.08 - ((z - 0.1) ** 2) / 0.12);
-      return 0.4 + cheek - muzzle - crown;
-    },
-    0.13
-  );
+  const base = lathe(knightBaseProfile());
+  const head = extrudeZY(KNIGHT_HEAD, knightHalfThickness, KNIGHT_ROUND);
   const eyes = [sphere(0.34, 2.72, 0.36, 0.085), sphere(-0.34, 2.72, 0.36, 0.085)];
   const nostrils = [sphere(0.15, 2.06, 1.13, 0.055), sphere(-0.15, 2.06, 1.13, 0.055)];
   const grooves: SDF[] = [];

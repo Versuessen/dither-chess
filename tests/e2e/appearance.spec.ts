@@ -110,7 +110,7 @@ test.describe('home and bot profile', () => {
     await row.click();
     const dialog = page.getByRole('dialog', { name: 'Outpost' });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText('Rating (Lichess rapid)')).toBeVisible();
+    await expect(dialog.getByRole('group', { name: 'Rating' })).toBeVisible();
     // Focus stays inside the dialog.
     for (let i = 0; i < 25; i++) {
       await page.keyboard.press('Tab');

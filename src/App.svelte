@@ -42,10 +42,6 @@
   });
 
   $effect(() => {
-    ui.home = !booting && (route.name === 'home' || route.name === 'bot');
-  });
-
-  $effect(() => {
     document.documentElement.dataset.motion = ui.reducedMotion ? 'reduce' : 'system';
   });
 

@@ -34,8 +34,6 @@ class UiState {
   loading = $state<number | null>(0);
   /** True when the dither layer could not start (no WebGL2). */
   ditherFailed = $state(false);
-  /** The home screen is showing: the dither layer may draw the live 3D piece. */
-  home = $state(false);
   /** Bumped when the background colours change outside a theme switch (Settings → Colours). */
   inksVersion = $state(0);
 

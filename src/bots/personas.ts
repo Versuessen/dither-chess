@@ -25,7 +25,7 @@ export const PERSONAS: readonly Persona[] = [
     name: 'Loose Ends',
     subject: 'pawn-crown',
     bio: 'Plays the first move that looks active. Hangs pieces most games, takes whatever you offer and keeps playing long after the position is lost.',
-    look: { screen: 'dots', accent: 1 }
+    look: { screen: 'glyphs', accent: 1 }
   },
   {
     id: 'early-queen',
@@ -57,7 +57,7 @@ export const PERSONAS: readonly Persona[] = [
     name: 'Coffeehouse',
     subject: 'board-rake',
     bio: 'Likes gambits and cheap traps. Wins material from players who move fast and gives it back to players who check twice.',
-    look: { screen: 'dots', accent: 5 }
+    look: { screen: 'glyphs', accent: 5 }
   },
   {
     id: 'long-diagonal',
@@ -113,7 +113,7 @@ export const PERSONAS: readonly Persona[] = [
     name: 'Promotion',
     subject: 'queen-tower',
     bio: 'Knows the basic endgames and pushes passed pawns with purpose. Calculates a few moves deep most of the time.',
-    look: { screen: 'dots', accent: 4 }
+    look: { screen: 'glyphs', accent: 4 }
   },
   {
     id: 'opposition',

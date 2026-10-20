@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { renderScene } from '../../tools/art/raymarch';
 import { testScene } from '../../tools/art/scenes';
 import { decodePNG, encodePNG } from '../../tools/art/png';
-import { chaikin, lathe, polygon2D, sphere } from '../../tools/art/sdf';
+import { lathe, polygon2D, sphere } from '../../tools/art/sdf';
+import { chaikin } from '../../src/dither/pieceProfiles';
 import { ART } from '../../src/dither/art';
 
 describe('SDF primitives', () => {

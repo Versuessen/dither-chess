@@ -64,9 +64,6 @@
     renderer?.setScroll(ui.scroll);
   });
   $effect(() => {
-    renderer?.setLive3D(ui.home);
-  });
-  $effect(() => {
     renderer?.setReducedMotion(ui.reducedMotion);
   });
   $effect(() => {
