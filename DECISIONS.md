@@ -272,3 +272,32 @@ See [CALIBRATION.md](CALIBRATION.md) for method, data and results; the decisions
 - **Move classes on the board**: in the review, the shown move's class sits as a round badge in the top-right corner of the square it went to (inside the square, so edge squares never clip it), in the class colour with its glyph (!!, !, ★, ✓, ≡, ·, ?!, ?, ??), as on chess.com. The checked king is highlighted in the review too.
 - **Check highlight**: the board was told only "in check", and chessground then marks the king of the side it believes is to move; while premoving that is set to the player, so the player's king lit up after giving check. The board now gets the colour actually in check.
 - **Music volume**: a 0–100 slider under Settings → Sound; the gain follows its square (0.5 at 100, the old level at the default 65).
+
+## Patch round 4
+
+### Fixes
+- **Model download on iPhones** ("Not enough arguments"): WebKit's `FileSystemHandle.move()` has only the form `move(destination, newName)` (WebKit's IDL), and rejects `move(name)`, which Chromium also accepts. The OPFS store now uses the two-argument form every engine has, and copies the file if moving fails. `tests/unit/opfs.test.ts` reproduces it with a fake OPFS carrying WebKit's signature.
+
+### Scenes
+- **Live scenes never slide**: the subject and background planes moved by different amounts (a flat parallax meant for the stills), which pulled pieces off their shadows and showed a pale disc under each. With a live scene both planes stay put and only the 3D camera moves; the drift and home-screen pattern movement are off too. Stills keep the flat parallax.
+- **Pieces stay on their squares**: on a board, pieces no longer turn on their own axes; the camera circles the whole board. Pieces stand on square centres (`on(size, file, rank)` in `sceneSpecs.ts`), with square sizes chosen so a piece's base fills about 80% of its square.
+- **Soft shadows** use Aaltonen's closest-approach estimate with a per-point jittered start, in both renderers: the banded rings around pieces become fine noise the dither hides.
+- **Citadel** has its own scene (a castled king behind three pawns); **Zugzwang** (2050, the model's highest level) has two kings in opposition across a pawn. Loose Ends and Long Diagonal are framed wider. All stills re-rendered; live and still frames match within a mean 0.4–4.5/255 per channel.
+- **The in-game morph** uses a flowing, domain-warped noise field instead of Voronoi cells: its value picks the screen, its level drifts with time (blobs grow, shrink and travel), and neighbouring screens cross-fade over a wide band.
+
+### Sound and music
+- **Interface tones are synthesised** (`tools/sounds/synth.py`): FM blips whose brightness dies away in ~15 ms, a 6 ms raised-cosine attack, a little low-passed square wave. The old cursor tone was the metallic click.
+- **Music**: The Divine Elf is removed. Six more of CoMiGo's CC0 loops were chosen against "Suspended" by spectral centroid, onset rate, spectral flatness and their spectrograms (synth arpeggios and pads, not melodic or percussive tracks): Staring at Reflections, Europa Ice (the 96 s extended version), Determined Start, Bugmintide, Space Rangers, Unease. "All, shuffled" plays them in turn, each for whole loops of at least 45 s, cross-fading into the next.
+
+### Settings
+- **Two columns**: settings on the left (appearance, play, sound, system), customisation on the right (a 6x6 preview with pieces, last move, premove, mark and arrow in the current colours; piece sets as tiles; board colours).
+- **Piece sets**: of Lichess's sets, only those whose licences allow redistribution in an AGPL app (lila COPYING.md) were considered; NC-licensed and "freeware" sets were left out. Chosen for the look: Pixel and Letters (AGPL-3.0, fit the dither/ASCII style), Shapes (CC BY-SA 4.0), Kiwen (CC BY 4.0), Merida (GPL-2.0+, a classic alternative).
+
+### Home and puzzles
+- **Home menu**: Play, then Opponents (a large button opening the list, six rows at a time, open state kept for the session) and Puzzles. An edge of the list fades only when there is more beyond it. The menu is anchored where the open menu is centred, so opening the list moves nothing.
+- **Puzzle source**: the Lichess puzzle database (CC0, 6.16 M puzzles, file of 2 Oct 2026, SHA-256 in the shipped file). Kept: popularity >= 85, played >= 1000 times, rating deviation <= 80 (1.44 M). Sample: 12,000 per difficulty band (< 1250, 1250–1650, 1650–2050, >= 2050), at least 900 per key piece where available, fixed seed; 47,989 puzzles, 2.2 MB gzipped, precached for offline use.
+- **Key piece** = the piece making the solver's first move (read from the FEN, since the opponent's move cannot touch it). It is what "knight puzzles" most plainly means; motifs and phases come from the Lichess themes.
+- **Difficulty**: the four bands, or "your level" (within 150 points of your puzzle rating, widened to 250/400/700 until at least 40 match).
+- **No repeats**: puzzles played in the last 60 days are skipped; if every match was, the one played longest ago comes back. A puzzle left after a move or a hint counts as seen.
+- **Introduction**: from the themes, the goal only (mate in n, win, hold, promote, defend) and the opponent's move; the motif is revealed afterwards so it does not give the answer away.
+- **Solving**: any mate counts (as on Lichess); a promotion matching the solution's squares takes the solution's piece. Puzzle rating: Elo against the puzzles' Lichess ratings, K 40 for the first 20 then 20; hints make an attempt unrated; showing the solution counts as a miss. Progress lives in settings, so backups carry it.

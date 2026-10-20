@@ -69,19 +69,38 @@ Material Sound Effects           CC0 1.0                     Polar_34
   https://polar-34.itch.io/material-sound-effects   wood.wav and stone1.wav: the board
   sounds (move, capture, castle, check, promote, low time) are knocks cut from them.
 Interface SFX Pack 1             CC0 1.0                     ObsydianX
-  https://obsydianx.itch.io/interface-sfx-pack-1    cursor, confirm, back and error tones
-  (style 2, 4 and 5): interface sounds, game start and end, check and promotion accents.
+  https://obsydianx.itch.io/interface-sfx-pack-1    confirm and error tones (style 2, 4
+  and 5): game start and end, illegal moves, check and promotion accents.
 CoMiGo's Short Music Loops       CC0 1.0                     Cosmo Myzrail Gorynych
-  https://comigo.itch.io/music-loops                "The Divine Elf" and "Suspended",
-  unchanged: the optional background music.
-  tools/sounds/make.py cuts, mixes and normalises the effects from the downloaded packs.
+  https://comigo.itch.io/music-loops                "Suspended", "Staring at Reflections",
+  "Europa Ice" (extended), "Determined Start", "Bugmintide", "Space Rangers" and
+  "Unease", unchanged: the optional background music.
+  tools/sounds/make.py cuts, mixes and normalises the effects from the downloaded packs;
+  the interface tones (select, confirm, back) are synthesised by tools/sounds/synth.py and
+  are covered by the project licence.
   None of these licences require credit; it is given here with thanks.
+
+------------------------------------------------------------------------------------------
+Piece sets (public/pieces), from Lichess (github.com/lichess-org/lila, public/piece),
+SVGs unchanged; copied by tools/pieces/lichess.py
+------------------------------------------------------------------------------------------
+Pixel                            AGPL-3.0-or-later           therealqtpi
+Letters (lila "letter")          AGPL-3.0-or-later           usolando
+Shapes                           CC BY-SA 4.0                flugsio
+Kiwen (lila "kiwen-suwi")        CC BY 4.0                   neverRare
+Merida                           GPL-2.0-or-later            Armando Hernandez Marroquin
+  CC BY-SA 4.0 and CC BY 4.0: https://creativecommons.org/licenses/by-sa/4.0/ and
+  https://creativecommons.org/licenses/by/4.0/. The 1-bit set (public/pieces/dither) is
+  rendered by this project (tools/art/pieces1bit.ts).
 
 ------------------------------------------------------------------------------------------
 Data (bundled)
 ------------------------------------------------------------------------------------------
 Lichess opening tables           CC0 1.0                     lichess.org contributors
   https://github.com/lichess-org/chess-openings (vendor/chess-openings): opening names.
+Lichess puzzle database          CC0 1.0                     lichess.org contributors
+  https://database.lichess.org/#puzzles: a sample of 47,989 puzzles in public/puzzles,
+  selected by tools/puzzles/build.py (positions, solutions, ratings and themes).
 
 ------------------------------------------------------------------------------------------
 Data and tools (not bundled)

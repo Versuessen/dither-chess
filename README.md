@@ -21,14 +21,19 @@ Windows 11 and Fedora (KDE), from one codebase.
   evaluation bar, a timeline to scrub through, the best move and line, every move classed
   (brilliant, excellent, best, good, book, neutral, inaccuracy, mistake, blunder), and each side's
   accuracy after Lichess's method, with the better side marked on every line.
+- **Puzzles**: about 48,000 well-tested puzzles from the Lichess puzzle database, filtered by
+  difficulty (or your own puzzle rating), the piece that makes the key move, game phase and
+  motif; picked at random without repeating recent ones, each opened by a sentence that names
+  the goal ("Black has mate in three").
 - **Opening names** from the Lichess opening tables, by position, during the game and in History.
 - **A board like the big sites'**: last-move and premove highlights, right-click marks and arrows
-  (knight arrows bend), and every colour adjustable in Settings.
+  (knight arrows bend), seven piece sets, and every colour adjustable in Settings.
 - **Live backgrounds**: each opponent's scene is rendered in real time on the GPU and screened in
   its own style (lines, ASCII glyphs, pixels, dots); behind the game the screens morph into each
-  other. Machines that cannot keep up, and reduced motion, get the pre-rendered stills.
-- **Sound and music**: CC0 board and interface sounds, and an optional quiet music loop (two CC0
-  tracks to choose from; see NOTICE).
+  other across drifting blobs. Machines that cannot keep up, and reduced motion, get the
+  pre-rendered stills.
+- **Sound and music**: soft interface tones, CC0 board sounds, and optional quiet music: one of
+  seven CC0 synth loops, or all of them in turn (see NOTICE).
 - **Phones too**: the website works on phones (iOS included) with a main-menu layout.
 - **Everything stays on your device**: games, ratings and backups (JSON + PGN).
 
@@ -92,7 +97,7 @@ pnpm tauri build --config src-tauri/tauri.offline.conf.json   # full-offline bui
 pnpm test           # unit tests: rules, clocks, PGN, rating, storage, encoders, model parity, packs
 pnpm check          # strict type check
 pnpm models:fetch   # check models/packs against models/manifest.json (SHA-256), fetch what is missing
-pnpm test:e2e       # Playwright on the production build: a full rated game, offline session,
+pnpm test:e2e       # Playwright on the production build: a full rated game, puzzles, offline session,
                     # WCAG 2.1 AA (axe) and keyboard play, performance budgets, themes, reduced motion,
                     # the Stockfish review, and phones (iPhone size, touch)
 pnpm test:static    # the website build on a plain static host: sub-path, no COOP/COEP (service-worker
@@ -139,8 +144,13 @@ still ask for them.
 - `vendor/chess-openings`: the Lichess opening tables (CC0); `pnpm openings` rebuilds
   `src/chess/openings.json` from them.
 - `vendor/stockfish`: Stockfish.js 19 lite (GPL-3.0), copied unchanged from npm, for game reviews.
-- `public/sounds`: cut from CC0 packs by `python3 tools/sounds/make.py <downloads>` (sources in NOTICE);
-  `public/music`: two CC0 tracks, unchanged.
+- `public/sounds`: board sounds cut from CC0 packs by `python3 tools/sounds/make.py <downloads>`
+  (sources in NOTICE), interface tones from `python3 tools/sounds/synth.py`;
+  `public/music`: seven CC0 tracks, unchanged.
+- `public/pieces`: five Lichess piece sets (licences in NOTICE), copied by
+  `python3 tools/pieces/lichess.py <lila checkout>`, and the project's own 1-bit set.
+- `public/puzzles`: the puzzle sample, `python3 tools/puzzles/build.py lichess_db_puzzle.csv.zst`
+  (needs `zstandard`; fixed seed, the source's SHA-256 is in the file's first line).
 
 ### Models
 
@@ -186,6 +196,7 @@ pnpm art:pieces                            # the 1-bit piece set
 | `src/models` | Model Manager: manifest, packs, OPFS / desktop store, SHA-256 |
 | `src/rating` | FIDE rating engine, ledger replay |
 | `src/analysis` | Stockfish game review: evaluations, accuracy, move classes |
+| `src/puzzles` | Puzzle set, filters and pick, the solving logic, puzzle rating |
 | `src/storage` | One interface over IndexedDB, SQLite and memory; backups |
 | `src/dither`, `src/design` | The WebGL2 dither layer, live scenes, and the design tokens |
 | `src/screens`, `src/ui` | Screens and shared components |
@@ -193,6 +204,7 @@ pnpm art:pieces                            # the 1-bit piece set
 | `tools/models` | Model conversion, parity, quantisation and packing (uv) |
 | `tools/calibrate` | Strength calibration and gauntlets (uv) |
 | `tools/art`, `tools/vite` | Artwork renderer; build plugins (service worker, pack mirror) |
+| `tools/puzzles`, `tools/pieces`, `tools/sounds` | Puzzle sample, piece-set import, sounds |
 | `packaging` | RPM signing and installer smoke tests |
 
 Decisions and the reasons for them are in [DECISIONS.md](DECISIONS.md).
