@@ -1,5 +1,6 @@
 """
-Make public/sounds/*.wav from the CC0 packs listed in NOTICE (Sounds and music).
+Make the board and game sounds in public/sounds from the CC0 packs listed in NOTICE (Sounds and
+music). The interface tones (select, confirm, back) are synthesised by synth.py.
 
     python3 tools/sounds/make.py <downloads-dir>
 
@@ -95,7 +96,4 @@ save('low-time', knock(stone, 2), 0.35)
 save('illegal', tone(f'{ui}/Error_tones/style5/error_style_5_001.ogg'), 0.45)
 save('start', tone(f'{ui}/Confirm_tones/style5/confirm_style_5_001.ogg'), 0.5)
 save('end', tone(f'{ui}/Confirm_tones/style2/confirm_style_2_001.ogg'), 0.5)
-# Interface.
-save('select', tone(f'{ui}/Cursor_tones/cursor_style_5.ogg'), 0.35)
-save('confirm', tone(f'{ui}/Confirm_tones/style5/confirm_style_5_001.ogg'), 0.4)
-save('back', tone(f'{ui}/Back_tones/style5/back_style_5_001.ogg'), 0.35)
+# Interface tones (select, confirm, back): synth.py.

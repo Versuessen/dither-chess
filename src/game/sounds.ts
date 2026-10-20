@@ -77,13 +77,26 @@ export function soundForSan(san: string): SoundName {
 
 // ------------------------------------------------------------------ music
 
-/** The music: one track, chosen in Settings, looping without a break. */
+/**
+ * The music: CoMiGo's CC0 loops in a calm synth / sci-fi vein. One track loops without a
+ * break, or 'mix' plays them all in a shuffled order, cross-fading from one to the next.
+ */
 export const MUSIC_TRACKS = [
-  { id: 'the-divine-elf', title: 'The Divine Elf' },
-  { id: 'suspended', title: 'Suspended' }
+  { id: 'suspended', title: 'Suspended' },
+  { id: 'staring-at-reflections', title: 'Staring at Reflections' },
+  { id: 'europa-ice', title: 'Europa Ice' },
+  { id: 'determined-start', title: 'Determined Start' },
+  { id: 'bugmintide', title: 'Bugmintide' },
+  { id: 'space-rangers', title: 'Space Rangers' },
+  { id: 'unease', title: 'Unease' }
 ] as const;
 export type MusicTrack = (typeof MUSIC_TRACKS)[number]['id'];
-export const DEFAULT_TRACK: MusicTrack = MUSIC_TRACKS[0].id;
+/** A track, or all of them in turn. */
+export type MusicChoice = MusicTrack | 'mix';
+export const DEFAULT_TRACK: MusicChoice = 'suspended';
+export const isMusicChoice = (v: unknown): v is MusicChoice => v === 'mix' || MUSIC_TRACKS.some((t) => t.id === v);
+/** In the mix, each track plays (looping) for at least this long before the next fades in. */
+const MIX_MIN_S = 45;
 
 /** Music volume 0..100 (Settings); the gain follows its square, so the slider feels even. */
 export const DEFAULT_MUSIC_VOLUME = 65;
@@ -123,21 +136,23 @@ function loopSpan(b: AudioBuffer): [number, number] {
 
 class Music {
   private on = false;
-  private track: MusicTrack = DEFAULT_TRACK;
+  private choice: MusicChoice = DEFAULT_TRACK;
   private level = musicGain(DEFAULT_MUSIC_VOLUME);
   private bus: GainNode | null = null;
   private current: { src: AudioBufferSourceNode; gain: GainNode; track: MusicTrack } | null = null;
+  private mixOrder: MusicTrack[] = [];
+  private mixTimer: ReturnType<typeof setTimeout> | null = null;
 
   get playing(): boolean {
     return this.on;
   }
 
-  /** Start (or, after a gesture, resume) the music; with another track, cross-fade to it. */
-  start(track: MusicTrack = this.track): void {
+  /** Start (or, after a gesture, resume) the music; with another choice, cross-fade to it. */
+  start(choice: MusicChoice = this.choice): void {
     const ac = audio();
     if (!ac) return;
-    const changed = track !== this.track;
-    this.track = track;
+    const changed = choice !== this.choice;
+    this.choice = choice;
     if (this.on && !changed) return;
     if (!this.bus) {
       // A gentle low-pass keeps the music behind everything else.
@@ -154,7 +169,11 @@ class Music {
       this.bus.gain.setValueAtTime(this.bus.gain.value, ac.currentTime);
       this.bus.gain.linearRampToValueAtTime(this.level, ac.currentTime + FADE_S);
     }
-    if (this.current?.track !== this.track) void this.play();
+    if (choice === 'mix') {
+      if (changed || !this.current) void this.play(this.nextInMix());
+    } else if (this.current?.track !== choice) {
+      void this.play(choice);
+    }
   }
 
   /** Set the volume (0..100); a playing track follows within a fraction of a second. */
@@ -170,6 +189,7 @@ class Music {
   stop(): void {
     if (!this.on) return;
     this.on = false;
+    this.clearMixTimer();
     const ac = ctx;
     const cur = this.current;
     this.current = null;
@@ -180,12 +200,32 @@ class Music {
     cur?.src.stop(ac.currentTime + 0.7);
   }
 
-  private async play(): Promise<void> {
+  private clearMixTimer(): void {
+    if (this.mixTimer) clearTimeout(this.mixTimer);
+    this.mixTimer = null;
+  }
+
+  /** The next track of the mix: a shuffled round of all of them, never the same one twice running. */
+  private nextInMix(): MusicTrack {
+    if (!this.mixOrder.length) {
+      const ids = MUSIC_TRACKS.map((t) => t.id as MusicTrack);
+      for (let i = ids.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+      }
+      if (ids[0] === this.current?.track) ids.push(ids.shift()!);
+      this.mixOrder = ids;
+    }
+    return this.mixOrder.shift()!;
+  }
+
+  private async play(track: MusicTrack): Promise<void> {
     const ac = audio();
     if (!ac || !this.on || !this.bus) return;
-    const track = this.track;
+    this.clearMixTimer();
     const b = await buffer(ac, `music/${track}.mp3`);
-    if (!b || !this.on || this.track !== track || this.current?.track === track) return;
+    if (!b || !this.on || this.current?.track === track) return;
+    if (this.choice !== 'mix' && this.choice !== track) return;
     // The old track fades out as the new one fades in.
     const old = this.current;
     const t0 = ac.currentTime + 0.05;
@@ -207,6 +247,12 @@ class Music {
     src.connect(gain).connect(this.bus);
     src.start(t0, loopStart);
     this.current = { src, gain, track };
+    if (this.choice === 'mix') {
+      // Whole loops, at least MIX_MIN_S, then the next track cross-fades in over the last one.
+      const loop = Math.max(1, loopEnd - loopStart);
+      const playFor = Math.ceil(MIX_MIN_S / loop) * loop;
+      this.mixTimer = setTimeout(() => void this.play(this.nextInMix()), Math.max(5, playFor - FADE_S) * 1000);
+    }
   }
 }
 

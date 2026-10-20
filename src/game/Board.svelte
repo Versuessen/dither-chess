@@ -2,6 +2,7 @@
   import 'chessground/assets/chessground.base.css';
   import 'chessground/assets/chessground.cburnett.css';
   import './pieces-dither.css';
+  import './pieces-lichess.css';
 </script>
 
 <script lang="ts">

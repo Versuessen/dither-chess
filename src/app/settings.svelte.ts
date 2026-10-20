@@ -4,9 +4,19 @@
  */
 import { storage } from '../storage';
 import { DEFAULT_COLOURS, sanitizeColours, type ColourSettings } from './colours';
-import { DEFAULT_MUSIC_VOLUME, DEFAULT_TRACK, MUSIC_TRACKS, type MusicTrack } from '../game/sounds';
+import { DEFAULT_MUSIC_VOLUME, DEFAULT_TRACK, isMusicChoice, type MusicChoice } from '../game/sounds';
 
-export type PieceSet = 'cburnett' | 'dither';
+/** The piece sets: chessground's, the project's own 1-bit set, and five from Lichess (NOTICE). */
+export const PIECE_SETS = [
+  { id: 'cburnett', label: 'Flat' },
+  { id: 'dither', label: '1-bit' },
+  { id: 'pixel', label: 'Pixel' },
+  { id: 'letter', label: 'Letters' },
+  { id: 'shapes', label: 'Shapes' },
+  { id: 'kiwen-suwi', label: 'Kiwen' },
+  { id: 'merida', label: 'Merida' }
+] as const;
+export type PieceSet = (typeof PIECE_SETS)[number]['id'];
 
 export interface AppSettings {
   colours: ColourSettings;
@@ -15,7 +25,8 @@ export interface AppSettings {
   sounds: boolean;
   /** Quiet music on the menus and in games: one track, looping. */
   music: boolean;
-  musicTrack: MusicTrack;
+  /** A track, or 'mix' for all of them in turn. */
+  musicTrack: MusicChoice;
   /** 0..100. */
   musicVolume: number;
   /** Bot moves as soon as inference finishes, with no human-like pause. */
@@ -52,9 +63,9 @@ function sanitize(v: (Partial<AppSettings> & { boardColours?: unknown }) | undef
   s.colours = sanitizeColours(v.colours);
   // Settings saved before colours were customisable had only a board preset.
   if (!v.colours && v.boardColours === 'duotone') s.colours.board = 'duotone';
-  if (v.pieceSet === 'cburnett' || v.pieceSet === 'dither') s.pieceSet = v.pieceSet;
+  if (PIECE_SETS.some((p) => p.id === v.pieceSet)) s.pieceSet = v.pieceSet!;
   if (typeof v.musicVolume === 'number' && Number.isFinite(v.musicVolume)) s.musicVolume = Math.round(Math.max(0, Math.min(100, v.musicVolume)));
-  if (MUSIC_TRACKS.some((t) => t.id === v.musicTrack)) s.musicTrack = v.musicTrack!;
+  if (isMusicChoice(v.musicTrack)) s.musicTrack = v.musicTrack;
   for (const k of FLAGS) {
     if (typeof v[k] === 'boolean') s[k] = v[k];
   }

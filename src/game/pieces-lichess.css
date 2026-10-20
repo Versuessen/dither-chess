@@ -1,0 +1,66 @@
+/* Piece sets from Lichess (lila @ f95d97f46f08), copied by tools/pieces/lichess.py. Licences in NOTICE. */
+/* merida: Armando Hernandez Marroquin, GPL-2.0-or-later */
+.cg-wrap.pieces-merida piece.pawn.white { background-image: url('/pieces/merida/wP.svg'); }
+.cg-wrap.pieces-merida piece.knight.white { background-image: url('/pieces/merida/wN.svg'); }
+.cg-wrap.pieces-merida piece.bishop.white { background-image: url('/pieces/merida/wB.svg'); }
+.cg-wrap.pieces-merida piece.rook.white { background-image: url('/pieces/merida/wR.svg'); }
+.cg-wrap.pieces-merida piece.queen.white { background-image: url('/pieces/merida/wQ.svg'); }
+.cg-wrap.pieces-merida piece.king.white { background-image: url('/pieces/merida/wK.svg'); }
+.cg-wrap.pieces-merida piece.pawn.black { background-image: url('/pieces/merida/bP.svg'); }
+.cg-wrap.pieces-merida piece.knight.black { background-image: url('/pieces/merida/bN.svg'); }
+.cg-wrap.pieces-merida piece.bishop.black { background-image: url('/pieces/merida/bB.svg'); }
+.cg-wrap.pieces-merida piece.rook.black { background-image: url('/pieces/merida/bR.svg'); }
+.cg-wrap.pieces-merida piece.queen.black { background-image: url('/pieces/merida/bQ.svg'); }
+.cg-wrap.pieces-merida piece.king.black { background-image: url('/pieces/merida/bK.svg'); }
+/* pixel: therealqtpi, AGPL-3.0-or-later */
+.cg-wrap.pieces-pixel piece.pawn.white { background-image: url('/pieces/pixel/wP.svg'); }
+.cg-wrap.pieces-pixel piece.knight.white { background-image: url('/pieces/pixel/wN.svg'); }
+.cg-wrap.pieces-pixel piece.bishop.white { background-image: url('/pieces/pixel/wB.svg'); }
+.cg-wrap.pieces-pixel piece.rook.white { background-image: url('/pieces/pixel/wR.svg'); }
+.cg-wrap.pieces-pixel piece.queen.white { background-image: url('/pieces/pixel/wQ.svg'); }
+.cg-wrap.pieces-pixel piece.king.white { background-image: url('/pieces/pixel/wK.svg'); }
+.cg-wrap.pieces-pixel piece.pawn.black { background-image: url('/pieces/pixel/bP.svg'); }
+.cg-wrap.pieces-pixel piece.knight.black { background-image: url('/pieces/pixel/bN.svg'); }
+.cg-wrap.pieces-pixel piece.bishop.black { background-image: url('/pieces/pixel/bB.svg'); }
+.cg-wrap.pieces-pixel piece.rook.black { background-image: url('/pieces/pixel/bR.svg'); }
+.cg-wrap.pieces-pixel piece.queen.black { background-image: url('/pieces/pixel/bQ.svg'); }
+.cg-wrap.pieces-pixel piece.king.black { background-image: url('/pieces/pixel/bK.svg'); }
+/* letter: usolando, AGPL-3.0-or-later */
+.cg-wrap.pieces-letter piece.pawn.white { background-image: url('/pieces/letter/wP.svg'); }
+.cg-wrap.pieces-letter piece.knight.white { background-image: url('/pieces/letter/wN.svg'); }
+.cg-wrap.pieces-letter piece.bishop.white { background-image: url('/pieces/letter/wB.svg'); }
+.cg-wrap.pieces-letter piece.rook.white { background-image: url('/pieces/letter/wR.svg'); }
+.cg-wrap.pieces-letter piece.queen.white { background-image: url('/pieces/letter/wQ.svg'); }
+.cg-wrap.pieces-letter piece.king.white { background-image: url('/pieces/letter/wK.svg'); }
+.cg-wrap.pieces-letter piece.pawn.black { background-image: url('/pieces/letter/bP.svg'); }
+.cg-wrap.pieces-letter piece.knight.black { background-image: url('/pieces/letter/bN.svg'); }
+.cg-wrap.pieces-letter piece.bishop.black { background-image: url('/pieces/letter/bB.svg'); }
+.cg-wrap.pieces-letter piece.rook.black { background-image: url('/pieces/letter/bR.svg'); }
+.cg-wrap.pieces-letter piece.queen.black { background-image: url('/pieces/letter/bQ.svg'); }
+.cg-wrap.pieces-letter piece.king.black { background-image: url('/pieces/letter/bK.svg'); }
+/* shapes: flugsio, CC BY-SA 4.0 */
+.cg-wrap.pieces-shapes piece.pawn.white { background-image: url('/pieces/shapes/wP.svg'); }
+.cg-wrap.pieces-shapes piece.knight.white { background-image: url('/pieces/shapes/wN.svg'); }
+.cg-wrap.pieces-shapes piece.bishop.white { background-image: url('/pieces/shapes/wB.svg'); }
+.cg-wrap.pieces-shapes piece.rook.white { background-image: url('/pieces/shapes/wR.svg'); }
+.cg-wrap.pieces-shapes piece.queen.white { background-image: url('/pieces/shapes/wQ.svg'); }
+.cg-wrap.pieces-shapes piece.king.white { background-image: url('/pieces/shapes/wK.svg'); }
+.cg-wrap.pieces-shapes piece.pawn.black { background-image: url('/pieces/shapes/bP.svg'); }
+.cg-wrap.pieces-shapes piece.knight.black { background-image: url('/pieces/shapes/bN.svg'); }
+.cg-wrap.pieces-shapes piece.bishop.black { background-image: url('/pieces/shapes/bB.svg'); }
+.cg-wrap.pieces-shapes piece.rook.black { background-image: url('/pieces/shapes/bR.svg'); }
+.cg-wrap.pieces-shapes piece.queen.black { background-image: url('/pieces/shapes/bQ.svg'); }
+.cg-wrap.pieces-shapes piece.king.black { background-image: url('/pieces/shapes/bK.svg'); }
+/* kiwen-suwi: neverRare, CC BY 4.0 */
+.cg-wrap.pieces-kiwen-suwi piece.pawn.white { background-image: url('/pieces/kiwen-suwi/wP.svg'); }
+.cg-wrap.pieces-kiwen-suwi piece.knight.white { background-image: url('/pieces/kiwen-suwi/wN.svg'); }
+.cg-wrap.pieces-kiwen-suwi piece.bishop.white { background-image: url('/pieces/kiwen-suwi/wB.svg'); }
+.cg-wrap.pieces-kiwen-suwi piece.rook.white { background-image: url('/pieces/kiwen-suwi/wR.svg'); }
+.cg-wrap.pieces-kiwen-suwi piece.queen.white { background-image: url('/pieces/kiwen-suwi/wQ.svg'); }
+.cg-wrap.pieces-kiwen-suwi piece.king.white { background-image: url('/pieces/kiwen-suwi/wK.svg'); }
+.cg-wrap.pieces-kiwen-suwi piece.pawn.black { background-image: url('/pieces/kiwen-suwi/bP.svg'); }
+.cg-wrap.pieces-kiwen-suwi piece.knight.black { background-image: url('/pieces/kiwen-suwi/bN.svg'); }
+.cg-wrap.pieces-kiwen-suwi piece.bishop.black { background-image: url('/pieces/kiwen-suwi/bB.svg'); }
+.cg-wrap.pieces-kiwen-suwi piece.rook.black { background-image: url('/pieces/kiwen-suwi/bR.svg'); }
+.cg-wrap.pieces-kiwen-suwi piece.queen.black { background-image: url('/pieces/kiwen-suwi/bQ.svg'); }
+.cg-wrap.pieces-kiwen-suwi piece.king.black { background-image: url('/pieces/kiwen-suwi/bK.svg'); }
