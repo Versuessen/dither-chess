@@ -189,6 +189,28 @@ export class OpfsStore implements ModelStore {
     }
   }
 
+  /**
+   * Put the verified download under its final name. `move(directory, name)` is the one form
+   * every engine has (WebKit has only that one, and rejects `move(name)` with "Not enough
+   * arguments"); without it, or if it fails, the bytes are copied and the part file deleted.
+   */
+  private async moveInto(d: FileSystemDirectoryHandle, from: string, to: string, data: Blob): Promise<void> {
+    const partHandle = (await d.getFileHandle(from)) as FileSystemFileHandle & { move?: (dir: FileSystemDirectoryHandle, name: string) => Promise<void> };
+    if (typeof partHandle.move === 'function') {
+      try {
+        await removeEntry(d, to);
+        await partHandle.move(d, to);
+        return;
+      } catch {
+        /* copy below */
+      }
+    }
+    const w = await (await d.getFileHandle(to, { create: true })).createWritable();
+    await w.write(data);
+    await w.close();
+    await removeEntry(d, from);
+  }
+
   private async finish(d: FileSystemDirectoryHandle, partName: string, pack: ManifestPack, onProgress: (p: Progress) => void): Promise<StoredPack> {
     const part = await fileOrNull(d, partName);
     if (!part) throw new Error('downloaded file is missing');
@@ -197,18 +219,7 @@ export class OpfsStore implements ModelStore {
       await removeEntry(d, partName);
       throw new Error(`Checksum mismatch for ${pack.title}: got ${hex.slice(0, 16)}…, expected ${pack.sha256.slice(0, 16)}…. The file was deleted.`);
     }
-    // Move into place: OPFS has no rename across all browsers, so copy then delete.
-    const handle = await d.getFileHandle(pack.file, { create: true });
-    if ('move' in handle && typeof (handle as unknown as { move: unknown }).move === 'function') {
-      await removeEntry(d, pack.file);
-      const partHandle = await d.getFileHandle(partName);
-      await (partHandle as unknown as { move: (name: string) => Promise<void> }).move(pack.file);
-    } else {
-      const w = await handle.createWritable();
-      await w.write(part);
-      await w.close();
-      await removeEntry(d, partName);
-    }
+    await this.moveInto(d, partName, pack.file, part);
     const stored: StoredPack = {
       id: pack.id,
       version: pack.version,
