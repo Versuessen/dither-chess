@@ -69,7 +69,7 @@ test('the website installs its models by itself and runs from a static host', as
 
   // The source of this build is offered and served.
   await page.goto('./#/settings');
-  const link = page.getByRole('link', { name: 'Download the source code of this version' });
+  const link = page.getByRole('link', { name: 'Source code of this version' });
   await expect(link).toBeVisible();
   const href = new URL((await link.getAttribute('href'))!, page.url()).href;
   const archive = await request.get(href);
