@@ -122,6 +122,10 @@
   --review-inaccuracy: #7a6000;
   --review-mistake: #b34d00;
   --review-blunder: #c2261b;
+  --review-brilliant: #0b7285;
+  --review-excellent: #3b6e1e;
+  --review-good: #56634b;
+  --review-book: #8a5a2b;
 
   /* Opponents' accents for the dither light ink (light theme: light colours, so the dark list
      text keeps 3:1 over them; checked in tests/unit/contrast.test.ts). */
@@ -171,6 +175,10 @@
   --review-inaccuracy: #e8c547;
   --review-mistake: #f28c38;
   --review-blunder: #ff6b5e;
+  --review-brilliant: #3bc9db;
+  --review-excellent: #a3d977;
+  --review-good: #a8b89a;
+  --review-book: #d9a066;
 
   /* Dark theme: deep colours, so the light list text keeps 3:1 over them. */
   --accent-1: #b4371d;
@@ -219,6 +227,10 @@
     --review-inaccuracy: #e8c547;
     --review-mistake: #f28c38;
     --review-blunder: #ff6b5e;
+    --review-brilliant: #3bc9db;
+    --review-excellent: #a3d977;
+    --review-good: #a8b89a;
+    --review-book: #d9a066;
 
     /* Dark theme: deep colours, so the light list text keeps 3:1 over them. */
     --accent-1: #b4371d;

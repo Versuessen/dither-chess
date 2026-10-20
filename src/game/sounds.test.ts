@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { soundForSan } from './sounds';
+import { MUSIC_TRACKS, audibleSpan, soundForSan } from './sounds';
+import { DEFAULT_SETTINGS, sanitizeSettings } from '../app/settings.svelte';
 
 describe('sounds', () => {
   it('picks the sound for a move from its SAN', () => {
@@ -22,6 +23,24 @@ describe('sounds', () => {
       expect(b.readUInt16LE(22)).toBe(1); // mono
       expect(b.length).toBeLessThan(40_000);
     }
-    for (const name of ['the-divine-elf', 'suspended']) expect(existsSync(`public/music/${name}.mp3`)).toBe(true);
+    for (const t of MUSIC_TRACKS) expect(existsSync(`public/music/${t.id}.mp3`), t.id).toBe(true);
+  });
+});
+
+describe('music', () => {
+  it('loops only the audible part of a track, so there is no gap', () => {
+    const rate = 1000;
+    const left = new Float32Array(3000);
+    const right = new Float32Array(3000);
+    for (let i = 500; i < 2600; i++) left[i] = Math.sin(i / 7) * 0.4;
+    right[2700] = 0.3;
+    expect(audibleSpan([left, right], rate)).toEqual([0.5, 2.701]);
+    // Silence throughout: play the whole buffer.
+    expect(audibleSpan([new Float32Array(2000)], rate)).toEqual([0, 2]);
+  });
+
+  it('remembers the chosen track, and ignores unknown ones', () => {
+    expect(sanitizeSettings({ music: true, musicTrack: 'suspended' }).musicTrack).toBe('suspended');
+    expect(sanitizeSettings({ music: true, musicTrack: 'nope' as never }).musicTrack).toBe(DEFAULT_SETTINGS.musicTrack);
   });
 });

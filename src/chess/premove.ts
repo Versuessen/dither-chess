@@ -19,7 +19,7 @@ export interface Premove {
 type Side = 'w' | 'b';
 
 /** The same position with `side` to move (en passant cleared: it belongs to the other side). */
-function withTurn(fen: string, side: Side): string {
+export function withTurn(fen: string, side: Side): string {
   const f = fen.split(' ');
   f[1] = side;
   f[3] = '-';

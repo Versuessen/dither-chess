@@ -58,7 +58,7 @@
 
   // Optional background music; the audio context starts on the first gesture.
   $effect(() => {
-    if (settings.value.music) music.start();
+    if (settings.value.music) music.start(settings.value.musicTrack);
     else music.stop();
   });
 
@@ -79,7 +79,7 @@
 
   function onPointerDown() {
     // Browsers keep audio suspended until a gesture; music switched on earlier starts now.
-    if (settings.value.music) music.start();
+    if (settings.value.music) music.start(settings.value.musicTrack);
   }
 
   function onKeydown(e: KeyboardEvent) {

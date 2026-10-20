@@ -121,8 +121,20 @@
     margin-left: 3px;
     font-weight: 700;
   }
-  /* Review colours, as on Lichess: inaccuracy amber, mistake orange, blunder red. Each also has
-     its glyph, so colour is never the only signal. */
+  /* Review colours: brilliant teal, the good moves greens, book brown, inaccuracy amber,
+     mistake orange, blunder red. Each also has its glyph, so colour is never the only signal. */
+  .note-brilliant .glyph {
+    color: var(--review-brilliant);
+  }
+  .note-excellent .glyph {
+    color: var(--review-excellent);
+  }
+  .note-good .glyph {
+    color: var(--review-good);
+  }
+  .note-book .glyph {
+    color: var(--review-book);
+  }
   .note-inaccuracy .glyph {
     color: var(--review-inaccuracy);
   }

@@ -107,16 +107,16 @@ for (const pack of packs) {
     await expect(month).toContainText('live');
     await expect(month.locator('td').nth(1)).toHaveText('1');
 
-    // History can take the game out of the rating, and put it back.
+    // The review (opened straight from History) can take the game out of the rating, and put it back.
     await page.goto('/#/history');
-    await page.getByRole('button', { name: 'Details' }).click();
-    await expect(page.getByTestId('dev-pgn')).toHaveCount(0);
+    await page.getByRole('link', { name: 'Review' }).click();
     await page.getByRole('button', { name: 'Remove from rating' }).click();
+    await page.goto('/#/history');
     await expect(page.getByText('Removed', { exact: true })).toBeVisible();
     await page.goto('/#/rating');
     await expect(page.getByText(/No rated rapid games yet/)).toBeVisible();
     await page.goto('/#/history');
-    await page.getByRole('button', { name: 'Details' }).click();
+    await page.getByRole('link', { name: 'Review' }).click();
     await page.getByRole('button', { name: 'Count for rating again' }).click();
     await page.goto('/#/rating');
     await expect(page.locator('table tbody tr').first().locator('td').nth(1)).toHaveText('1');

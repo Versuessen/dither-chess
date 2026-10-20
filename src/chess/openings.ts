@@ -37,6 +37,19 @@ export function nameOpening(table: OpeningTable, fens: readonly string[]): Openi
   return null;
 }
 
+/**
+ * How many of a game's first moves are opening theory: the moves up to the deepest named
+ * position reached from the start without leaving the tables for more than a few moves (named
+ * positions are the ends of named lines; the moves between them are theory too).
+ */
+export function bookPlies(table: OpeningTable, fens: readonly string[], gap = 4): number {
+  let last = 0;
+  for (let i = 1; i < fens.length && i - last <= gap; i++) {
+    if (table.has(epd(fens[i]!))) last = i;
+  }
+  return last;
+}
+
 /** "Russian Game" from "Russian Game: Classical Attack, Chigorin Variation". */
 export function family(name: string): string {
   return name.split(':')[0]!.trim();

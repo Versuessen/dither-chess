@@ -8,25 +8,27 @@ no server. Stockfish is included for one job only: reviewing your finished games
 It runs as a web app (installable PWA, offline after the first visit) and as a desktop app for
 Windows 11 and Fedora (KDE), from one codebase.
 
-- **Bots that play like people of a rating**: fastelo (600–1900), Maia-3 5M (600–1950), Maia-3 23M
-  (600–2050, optional download) and Maia-2 (1100–1800). Every level is measured: matched to the move
-  quality of held-out human games, then (Maia) spaced by 400-game matches so that levels 200 apart
-  play 200 Elo apart. fastelo keeps its own published calibration; its matches show levels between
-  800 and 1800 playing closer together than labelled (see [CALIBRATION.md](CALIBRATION.md)). All
-  ratings are on the Lichess rapid scale.
+- **Bots that play like people of a rating**: one model, Maia-3 23M, from 600 to 2050. Every level
+  is measured: matched to the move quality of held-out human games, then spaced by 400-game matches
+  so that levels 200 apart play 200 Elo apart (see [CALIBRATION.md](CALIBRATION.md)). All ratings
+  are on the Lichess rapid scale.
 - **Ratings by FIDE's rules, one per speed**: bullet, blitz, rapid and classical (untimed games
   count as classical), each with the FIDE Rapid & Blitz Rating Regulations' method (monthly periods,
   K-factors, initial rating, 400-point rule) plus a live rating. Rated or casual is your choice for
-  any clock. It is a training tool: any game can be aborted without rating, and History can take a
-  game out of the rating (or put it back).
-- **A move-quality estimate** after each game (fastelo's Rater), shown apart from the rating.
+  any clock. It is a training tool: any game can be aborted without rating, and a game's review can
+  take it out of the rating (or put it back).
 - **Game review**: Stockfish 19 (lite, WebAssembly, in the browser) evaluates every position: an
-  evaluation bar and graph, the best move and line, inaccuracies, mistakes and blunders, and each
-  side's accuracy and average centipawn loss, after Lichess's method.
+  evaluation bar, a timeline to scrub through, the best move and line, every move classed
+  (brilliant, excellent, best, good, book, neutral, inaccuracy, mistake, blunder), and each side's
+  accuracy after Lichess's method, with the better side marked on every line.
 - **Opening names** from the Lichess opening tables, by position, during the game and in History.
 - **A board like the big sites'**: last-move and premove highlights, right-click marks and arrows
   (knight arrows bend), and every colour adjustable in Settings.
-- **Sound and music**: CC0 board and interface sounds, and optional quiet music (see NOTICE).
+- **Live backgrounds**: each opponent's scene is rendered in real time on the GPU and screened in
+  its own style (lines, ASCII glyphs, pixels, dots); behind the game the screens morph into each
+  other. Machines that cannot keep up, and reduced motion, get the pre-rendered stills.
+- **Sound and music**: CC0 board and interface sounds, and an optional quiet music loop (two CC0
+  tracks to choose from; see NOTICE).
 - **Phones too**: the website works on phones (iOS included) with a main-menu layout.
 - **Everything stays on your device**: games, ratings and backups (JSON + PGN).
 
@@ -35,9 +37,8 @@ Windows 11 and Fedora (KDE), from one codebase.
 ### Web
 
 Open **https://ditherchess.vercel.app** in a Chromium-based browser, Firefox or Safari, and
-install it from the address bar if you like. The first visit downloads every model by itself:
-the one for your first game while the start screen loads (fastelo, 15 MB), the others (76 MB) in
-the background while you play. After that it works without a connection.
+install it from the address bar if you like. The first visit downloads the model (Maia-3 23M,
+27 MB) by itself while the start screen loads. After that it works without a connection.
 
 ### Windows 11
 
@@ -49,7 +50,7 @@ administrator rights:
   or into the folder of an earlier DITHER install)
 
 The installers carry the WebView2 runtime (offline installer), so they work without a connection.
-The *offline* builds also carry every model pack.
+The *offline* builds also carry the model pack.
 
 ### Fedora 44 and 45
 
@@ -91,7 +92,7 @@ pnpm tauri build --config src-tauri/tauri.offline.conf.json   # full-offline bui
 pnpm test           # unit tests: rules, clocks, PGN, rating, storage, encoders, model parity, packs
 pnpm check          # strict type check
 pnpm models:fetch   # check models/packs against models/manifest.json (SHA-256), fetch what is missing
-pnpm test:e2e       # Playwright on the production build: a full rated game per model, offline session,
+pnpm test:e2e       # Playwright on the production build: a full rated game, offline session,
                     # WCAG 2.1 AA (axe) and keyboard play, performance budgets, themes, reduced motion,
                     # the Stockfish review, and phones (iPhone size, touch)
 pnpm test:static    # the website build on a plain static host: sub-path, no COOP/COEP (service-worker
@@ -114,13 +115,13 @@ configuration, so the Vercel project needs no settings beyond importing the repo
   runs pnpm 6) and builds with Node 24.
 - **Headers**: COOP/COEP/CORP on every path, so the page is cross-origin isolated (multi-threaded
   inference) from the first load; long caching only for hashed assets and versioned packs.
-- **Models**: the build copies the committed packs (`models/packs`) next to the app and
-  `DITHER_PREINSTALL=all` makes the site install all of them by itself (`DITHER_PREINSTALL` also
-  takes a list of pack ids). The desktop app downloads packs from the website too.
+- **Models**: the build copies the committed pack (`models/packs`) next to the app and
+  `DITHER_PREINSTALL=all` makes the site install it by itself (`DITHER_PREINSTALL` also takes a
+  list of pack ids). The desktop app downloads the pack from the website too.
 - **Source**: `DITHER_SOURCE_ARCHIVE=1` puts the source of the build at
   `/source/dither-source.tar.gz`, linked under Settings → System. The app is AGPL-3.0 and contains
-  GPL-3.0 and AGPL-3.0 code, so the site has to offer its source even when this repository is
-  private.
+  AGPL-3.0 (Maia-3) and GPL-3.0 (Stockfish) code, so the site has to offer its source even when this
+  repository is private.
 
 Every push to `main` deploys to production; other branches and pull requests get preview
 deployments. The Vercel project is `dither-chess` in the team `dither-chess`; it answers at
@@ -164,7 +165,10 @@ Stockfish (pinned official release) is used here only to score moves. It is neve
 
 ### Artwork
 
-The images are rendered by this project from signed distance fields; nothing is downloaded.
+The images are rendered by this project from signed distance fields; nothing is downloaded. The
+staging of every scene (`src/dither/sceneSpecs.ts`) and the piece shapes
+(`src/dither/pieceProfiles.ts`) are shared by the offline renderer, which makes the still images,
+and the live GPU renderer (`src/dither/liveScene.ts`), so both show the same scene.
 
 ```bash
 pnpm art                                   # all scenes, about 6 minutes on 2 cores
@@ -180,9 +184,10 @@ pnpm art:pieces                            # the 1-bit piece set
 | `src/bots` | Personas and human behaviour (think time, draws, resignation) |
 | `src/inference` | Encoders, sampling, calibration settings, the onnxruntime-web worker |
 | `src/models` | Model Manager: manifest, packs, OPFS / desktop store, SHA-256 |
-| `src/rating` | FIDE rating engine, ledger replay, move-quality estimate |
+| `src/rating` | FIDE rating engine, ledger replay |
+| `src/analysis` | Stockfish game review: evaluations, accuracy, move classes |
 | `src/storage` | One interface over IndexedDB, SQLite and memory; backups |
-| `src/dither`, `src/design` | The WebGL2 dither layer and the design tokens |
+| `src/dither`, `src/design` | The WebGL2 dither layer, live scenes, and the design tokens |
 | `src/screens`, `src/ui` | Screens and shared components |
 | `src-tauri` | Desktop shell: SQLite, model store, Linux workarounds, installer config |
 | `tools/models` | Model conversion, parity, quantisation and packing (uv) |

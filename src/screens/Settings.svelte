@@ -12,16 +12,20 @@
   import ColourField from '../ui/ColourField.svelte';
   import { inference } from '../inference/client';
   import type { InitResult } from '../inference/protocol';
+  import { MUSIC_TRACKS, type MusicTrack } from '../game/sounds';
 
-  type Flag = 'coordinates' | 'sounds' | 'music' | 'instantBot' | 'premoves' | 'showDests' | 'autoQueen';
+  type Flag = 'coordinates' | 'instantBot' | 'premoves' | 'showDests' | 'autoQueen';
   const flags: { key: Flag; label: string; hint: string }[] = [
     { key: 'coordinates', label: 'Coordinates', hint: '' },
     { key: 'showDests', label: 'Legal moves', hint: '' },
     { key: 'premoves', label: 'Premoves', hint: 'Right-click cancels queued premoves.' },
     { key: 'autoQueen', label: 'Auto-queen', hint: '' },
-    { key: 'sounds', label: 'Sounds', hint: '' },
     { key: 'instantBot', label: 'Instant bot', hint: '' }
   ];
+  type MusicChoice = MusicTrack | 'off';
+  const musicChoice = $derived<MusicChoice>(settings.value.music ? settings.value.musicTrack : 'off');
+  const musicOptions: { value: MusicChoice; label: string }[] = [{ value: 'off', label: 'Off' }, ...MUSIC_TRACKS.map((t) => ({ value: t.id as MusicChoice, label: t.title }))];
+  const setMusic = (v: MusicChoice) => set(v === 'off' ? { music: false } : { music: true, musicTrack: v });
   const onOff = [
     { value: true, label: 'On' },
     { value: false, label: 'Off' }
@@ -113,6 +117,18 @@
           {#if f.hint}<p class="hint">{f.hint}</p>{/if}
         </div>
       {/each}
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="s-sound">
+    <h2 id="s-sound" class="label">Sound</h2>
+    <div class="rows two">
+      <div class="row">
+        <Toggle legend="Sounds" value={settings.value.sounds} options={onOff} onchange={(v) => set({ sounds: v })} />
+      </div>
+      <div class="row">
+        <Toggle legend="Music" value={musicChoice} options={musicOptions} onchange={setMusic} />
+      </div>
     </div>
   </section>
 

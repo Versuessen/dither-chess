@@ -235,3 +235,34 @@ See [CALIBRATION.md](CALIBRATION.md) for method, data and results; the decisions
 - **Phones**: the home screen becomes a main menu (Play, Opponents, then the other screens), the game board runs edge to edge, and nothing scrolls sideways (`tests/e2e/mobile.spec.ts` at iPhone 13 size).
 - **Secondary screens load on first use**, keeping the first screen's JavaScript under the 400 kB budget (262 kB).
 
+
+## Patch round 2 — the owner's second changelog
+
+### Board
+- **Premoves are the controller's**, not chessground's: chessground's premove ran before the new legal moves reached it, so premoves were dropped. The controller keeps a queue (several premoves), each checked when its turn comes; an illegal one drops the rest of the queue. Right-click clears it. Premove destinations are the legal moves with the side to move flipped, so blocked lines, captures behind the first piece and check are respected.
+- **Long opening names** take two ellipsised lines (family, then variation); the full name is the tooltip.
+
+### One model
+- **Maia-3 23M is the only bot** (the owner's choice): fastelo, Maia-2 rapid and Maia-3 5M are gone, with fastelo's move-quality estimate. The project stays AGPL-3.0 because of Maia-3. The model tools (`tools/models`, `tools/calibrate`) still know the other models, for reproducing the calibration report.
+- **The start panel** shows only rating, colour, clock and rated/casual.
+
+### Backgrounds
+- **Live scenes replace the floating 3D piece**: the owner preferred the stills' staging. Every scene's staging and the piece shapes are now shared modules (`src/dither/sceneSpecs.ts`, `pieceProfiles.ts`) used by the offline renderer and by a GPU sphere tracer (`liveScene.ts`); the piece profiles become distance-field textures built in a worker. Live and still frames match to within a mean 1–3/255 per channel. The camera follows the pointer and the pieces turn slowly.
+- **No still flashes first**: the first image waits up to 4 s for the live scene. Software WebGL (SwiftShader, llvmpipe), reduced motion, and machines whose frames take over 60 ms for two seconds (or 250 ms three times in a row) get the stills.
+- **The hexagonal dot screen is replaced by ASCII glyphs** (" .:-=+*#%@" in Departure Mono, 5:8 cells).
+- **Behind the game** the screen pattern itself moves with the pointer and drifts; the parallax is stronger; drifting Voronoi cells each show one screen and hand it on to the next every ~11 s through a pixel dissolve.
+- **Home** cycles through the opponents' scenes every 6.5 s while nothing is pointed at.
+
+### Menus and phones
+- **Play is the largest item**, the opponents about a third smaller below a wider gap. On phones the navigation sits at the top and the roster is always shown, smaller; it no longer collapses.
+- **Profile portraits are gone**, as is descriptive text that said nothing the screen did not.
+
+### Game review
+- **Opened straight from History** ("Review"); taking a game out of the rating and the PGN download moved to the review.
+- **Move classes**, best first: brilliant, excellent, best, good, book, neutral, inaccuracy, mistake, blunder. Inaccuracy, mistake and blunder keep Lichess's thresholds (a drop of 5, 10, 15 points of winning chance); best is the engine's move; excellent loses under 2 points, good under 5. Book: the moves up to the deepest named Lichess opening position, unless the engine calls one an error. Neutral: the only legal move, or a move in a game already decided (97%+ either way) that does not change that. Brilliant: a sacrifice (the opponent can then win at least two more points of material, net of what the move took) that is the engine's move, or within 2 points of it while the game was open, and leaves the mover at least level.
+- **The better side is marked in white** on accuracy and on every class where more (or fewer) is better; book and neutral are neither.
+- **The page fits the window** (desktop): the board is sized by the height, the move list is the only part that scrolls, and the explanation always takes three lines.
+- **Timeline**: the evaluation graph sits under the board, as wide as it, and is a slider: click or drag to scrub, hover shows the move, brilliancies and errors are marked; ↑/↓ and the Key buttons jump between them.
+
+### Music
+- **One track, looping**: the two CC0 tracks are 15 s and 24 s long, so playing them in turn with pauses meant a pause every 20 s or so. Now the chosen track (Settings → Sound) loops without a break; leading and trailing silence are trimmed from the loop, and a change of track cross-fades.

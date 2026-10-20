@@ -67,7 +67,7 @@ describe('theme tokens meet WCAG AA', () => {
 
       it('game review marks pass 4.5:1 on the panel', () => {
         const panel = parseColor(t['panel']!);
-        for (const k of ['review-best', 'review-inaccuracy', 'review-mistake', 'review-blunder']) {
+        for (const k of ['review-brilliant', 'review-excellent', 'review-best', 'review-good', 'review-book', 'review-inaccuracy', 'review-mistake', 'review-blunder']) {
           expect(contrast(parseColor(t[k]!), panel), k).toBeGreaterThanOrEqual(AA_NORMAL);
         }
       });

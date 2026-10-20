@@ -1,7 +1,9 @@
 /**
  * Game review maths, after Lichess (lila: WinPercent, AccuracyPercent and the advice
- * thresholds). Evaluations are centipawns from White's point of view, or a mate distance.
- * Everything here is pure: the engine (engine.ts) supplies the evaluations.
+ * thresholds), with the finer move classes players know from chess.com (brilliant, excellent,
+ * good, book). Evaluations are centipawns from White's point of view, or a mate distance.
+ * Everything here is pure: the engine (engine.ts) supplies the evaluations and analyse.ts the
+ * chess facts (sacrifices, forced moves, book).
  */
 
 import type { StoredEval } from '../storage/types';
@@ -12,7 +14,22 @@ import type { StoredEval } from '../storage/types';
  */
 export type Eval = StoredEval;
 
-export type Judgement = 'best' | 'good' | 'inaccuracy' | 'mistake' | 'blunder';
+/** Move classes, best first (the order of the review summary). */
+export const JUDGEMENTS = ['brilliant', 'excellent', 'best', 'good', 'book', 'neutral', 'inaccuracy', 'mistake', 'blunder'] as const;
+export type Judgement = (typeof JUDGEMENTS)[number];
+
+/** For each class, whether more of it is better (true), worse (false), or neither (null). */
+export const MORE_IS_BETTER: Record<Judgement, boolean | null> = {
+  brilliant: true,
+  excellent: true,
+  best: true,
+  good: true,
+  book: null,
+  neutral: null,
+  inaccuracy: false,
+  mistake: false,
+  blunder: false
+};
 
 export interface MoveReview {
   ply: number;
@@ -35,11 +52,21 @@ export interface MoveReview {
 export interface SideSummary {
   accuracy: number;
   acpl: number;
-  inaccuracies: number;
-  mistakes: number;
-  blunders: number;
-  best: number;
+  /** Moves in each class. */
+  counts: Record<Judgement, number>;
   moves: number;
+}
+
+/** What the engine cannot say about a move: supplied by analyse.ts from the positions. */
+export interface MoveFacts {
+  /** SAN of a UCI move in the position before move `ply` (0-based). */
+  sanOf(ply: number, uci: string): string | null;
+  /** The move at `ply` (0-based) gives up material (see analyse.ts sacrifice). */
+  sacrifice?(ply: number): boolean;
+  /** The move at `ply` (0-based) was the only legal move. */
+  forced?(ply: number): boolean;
+  /** The first `book` moves of the game are opening theory. */
+  book?: number;
 }
 
 const CP_CEILING = 1000;
@@ -64,17 +91,76 @@ export function moveAccuracy(winBefore: number, winAfter: number): number {
   return Math.max(0, Math.min(100, raw + 1));
 }
 
-/** Lichess advice thresholds on the drop in winning chances (on a -1..1 scale: 0.1 / 0.2 / 0.3). */
+/** Win-chance drops (mover's view, percentage points): Lichess's advice thresholds, and finer
+ * bands for the good moves. */
+export const THRESHOLDS = { excellent: 2, good: 5, inaccuracy: 5, mistake: 10, blunder: 15 } as const;
+
+/** A position whose result no longer depends on the move: mover's win chance this high or low. */
+const DECIDED = 97;
+
+/**
+ * Classify a move from the mover's win chances before and after it. `playedBest`: it is the
+ * engine's move. Sacrifices, forced moves and book moves are classified by `classify`.
+ */
 export function judge(winBefore: number, winAfter: number, playedBest: boolean): Judgement {
   if (playedBest) return 'best';
-  const drop = (winBefore - winAfter) / 50;
-  if (drop >= 0.3) return 'blunder';
-  if (drop >= 0.2) return 'mistake';
-  if (drop >= 0.1) return 'inaccuracy';
+  const drop = winBefore - winAfter;
+  if (drop >= THRESHOLDS.blunder) return 'blunder';
+  if (drop >= THRESHOLDS.mistake) return 'mistake';
+  if (drop >= THRESHOLDS.inaccuracy) return 'inaccuracy';
+  if (drop < THRESHOLDS.excellent) return 'excellent';
   return 'good';
 }
 
-export const JUDGEMENT_GLYPH: Record<Judgement, string> = { best: '★', good: '', inaccuracy: '?!', mistake: '?', blunder: '??' };
+/**
+ * The full classification. The only legal move is neutral (book in the opening); opening theory
+ * is book unless the engine calls it an error; a sound sacrifice (the engine's move, or nearly
+ * it in an open game) that keeps the game at least level is brilliant; any other move in a game already decided either way is neutral
+ * (unless it throws the result away); otherwise `judge`.
+ */
+export function classify(
+  winBefore: number,
+  winAfter: number,
+  playedBest: boolean,
+  facts: { book?: boolean; forced?: boolean; sacrifice?: boolean } = {}
+): Judgement {
+  if (facts.forced) return facts.book ? 'book' : 'neutral';
+  const engine = judge(winBefore, winAfter, playedBest);
+  const error = engine === 'inaccuracy' || engine === 'mistake' || engine === 'blunder';
+  // Theory, unless the engine finds it a real error (the tables name a few traps too).
+  if (facts.book && !error) return 'book';
+  const drop = winBefore - winAfter;
+  // A sacrifice is brilliant when it is the engine's own move, or close to it while the game
+  // was still open, and the mover is not worse after it.
+  if (facts.sacrifice && winAfter >= 50 && (playedBest || (drop < THRESHOLDS.excellent && winBefore < 95))) return 'brilliant';
+  const decided = (winBefore >= DECIDED && winAfter >= DECIDED) || (winBefore <= 100 - DECIDED && winAfter <= 100 - DECIDED);
+  if (decided && !playedBest) return 'neutral';
+  return engine;
+}
+
+export const JUDGEMENT_GLYPH: Record<Judgement, string> = {
+  brilliant: '!!',
+  excellent: '!',
+  best: '★',
+  good: '✓',
+  book: '≡',
+  neutral: '·',
+  inaccuracy: '?!',
+  mistake: '?',
+  blunder: '??'
+};
+
+export const JUDGEMENT_LABEL: Record<Judgement, string> = {
+  brilliant: 'Brilliant',
+  excellent: 'Excellent',
+  best: 'Best',
+  good: 'Good',
+  book: 'Book',
+  neutral: 'Neutral',
+  inaccuracy: 'Inaccuracy',
+  mistake: 'Mistake',
+  blunder: 'Blunder'
+};
 
 function mean(xs: number[]): number {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
@@ -115,7 +201,7 @@ export function gameAccuracy(whiteWins: number[], moves: { color: 'w' | 'b'; acc
 export function review(
   moves: readonly { color: 'w' | 'b'; san: string; uci: string }[],
   evals: readonly Eval[],
-  sanOf: (ply: number, uci: string) => string | null
+  facts: MoveFacts
 ): { moves: MoveReview[]; sides: Record<'w' | 'b', SideSummary> } {
   const whiteWins = evals.map(winPercent);
   const out: MoveReview[] = moves.map((m, i) => {
@@ -135,25 +221,40 @@ export function review(
       winAfter,
       accuracy: playedBest ? 100 : moveAccuracy(winBefore, winAfter),
       cpLoss: playedBest ? 0 : cpLoss,
-      judgement: judge(winBefore, winAfter, playedBest),
+      judgement: classify(winBefore, winAfter, playedBest, {
+        book: i < (facts.book ?? 0),
+        forced: facts.forced?.(i) ?? false,
+        sacrifice: facts.sacrifice?.(i) ?? false
+      }),
       best: before.best,
-      bestSan: before.best ? sanOf(i, before.best) : null
+      bestSan: before.best ? facts.sanOf(i, before.best) : null
     };
   });
   const acc = gameAccuracy(whiteWins, out);
   const side = (c: 'w' | 'b'): SideSummary => {
     const mine = out.filter((m) => m.color === c);
+    const counts = Object.fromEntries(JUDGEMENTS.map((j) => [j, mine.filter((m) => m.judgement === j).length])) as Record<Judgement, number>;
     return {
       accuracy: Math.round((acc[c] ?? 0) * 10) / 10,
       acpl: Math.round(mean(mine.map((m) => m.cpLoss))),
-      inaccuracies: mine.filter((m) => m.judgement === 'inaccuracy').length,
-      mistakes: mine.filter((m) => m.judgement === 'mistake').length,
-      blunders: mine.filter((m) => m.judgement === 'blunder').length,
-      best: mine.filter((m) => m.judgement === 'best').length,
+      counts,
       moves: mine.length
     };
   };
   return { moves: out, sides: { w: side('w'), b: side('b') } };
+}
+
+/**
+ * Which side did better on a summary line: 'w', 'b', or null for a tie or a class that is
+ * neither good nor bad. `stat` is a move class or 'accuracy'.
+ */
+export function betterSide(sides: Record<'w' | 'b', SideSummary>, stat: Judgement | 'accuracy'): 'w' | 'b' | null {
+  const higher = stat === 'accuracy' ? true : MORE_IS_BETTER[stat];
+  if (higher === null) return null;
+  const w = stat === 'accuracy' ? sides.w.accuracy : sides.w.counts[stat];
+  const b = stat === 'accuracy' ? sides.b.accuracy : sides.b.counts[stat];
+  if (w === b) return null;
+  return (w > b) === higher ? 'w' : 'b';
 }
 
 /** "+1.4", "−0.3", "#3", "#−2" for an evaluation bar or graph label. */

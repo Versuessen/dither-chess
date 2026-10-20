@@ -10,9 +10,19 @@
   import { boardPalette } from '../app/colours';
   import { ui } from '../app/ui.svelte';
   import { href } from '../app/router.svelte';
+  import { rating } from '../rating/rating.svelte';
   import { Engine, ENGINE_NAME } from '../analysis/engine';
-  import { analyseGame, lineSan, positions, sanIn } from '../analysis/analyse';
-  import { JUDGEMENT_GLYPH, formatEval, review, winPercent, type Judgement } from '../analysis/review';
+  import { analyseGame, lineSan, moveFacts, positions } from '../analysis/analyse';
+  import {
+    JUDGEMENTS,
+    JUDGEMENT_GLYPH,
+    JUDGEMENT_LABEL,
+    betterSide,
+    formatEval,
+    review,
+    winPercent,
+    type Judgement
+  } from '../analysis/review';
   import { loadOpenings, nameOpening, type OpeningTable } from '../chess/openings';
   import { describeTermination } from '../chess/rules';
   import { formatTimeControl } from '../chess/timeControl';
@@ -30,7 +40,9 @@
   let ply = $state(0);
   let orientation = $state<'white' | 'black'>('white');
   let openings = $state<OpeningTable | null>(null);
-  let graphWidth = $state(320);
+  let timelineWidth = $state(480);
+  let hover = $state<number | null>(null);
+  let message = $state<string | null>(null);
   let stopper: AbortController | null = null;
   let engine: Engine | null = null;
 
@@ -62,7 +74,6 @@
       engine ??= await Engine.create();
       const a = await analyseGame(g, engine, (done, total) => (progress = { done, total }), stopper.signal);
       analysis = a;
-      // Re-read first: the move-quality estimate may have been saved meanwhile.
       const fresh = (await storage().getGame(g.id)) ?? ($state.snapshot(g) as StoredGame);
       game = { ...fresh, analysis: a };
       await storage().putGame({ ...fresh, analysis: a });
@@ -76,15 +87,16 @@
   const fens = $derived(game ? positions(game) : []);
   const result = $derived.by(() => {
     if (!game || !analysis) return null;
-    const g = game;
-    return review(g.moves, analysis.evals, (i, uci) => sanIn(fens[i]!, uci));
+    return review(game.moves, analysis.evals, moveFacts(game, fens, openings));
   });
   const youSide = $derived(game?.humanColor ?? 'w');
   const botSide = $derived(youSide === 'w' ? 'b' : 'w');
-  const LABEL: Record<Judgement, string> = { best: 'Best move', good: 'Good move', inaccuracy: 'Inaccuracy', mistake: 'Mistake', blunder: 'Blunder' };
+  // Every class but the plain ones carries its glyph in the move list.
   const notes = $derived.by(() => {
     const out: Record<number, { glyph: string; kind: string; label: string }> = {};
-    for (const m of result?.moves ?? []) if (m.judgement !== 'good') out[m.ply] = { glyph: JUDGEMENT_GLYPH[m.judgement], kind: m.judgement, label: LABEL[m.judgement] };
+    for (const m of result?.moves ?? []) {
+      if (m.judgement !== 'good' && m.judgement !== 'neutral') out[m.ply] = { glyph: JUDGEMENT_GLYPH[m.judgement], kind: m.judgement, label: JUDGEMENT_LABEL[m.judgement] };
+    }
     return out;
   });
 
@@ -99,28 +111,59 @@
   const whiteShare = $derived(shown ? winPercent(shown) : 50);
   const opening = $derived(openings && game ? nameOpening(openings, fens) : null);
 
-  // Evaluation graph: White's winning chances after every move.
-  const graph = $derived.by(() => {
-    if (!analysis) return null;
-    const W = Math.max(200, Math.round(graphWidth));
-    const H = 96;
-    const n = analysis.evals.length;
-    const x = (i: number) => (n === 1 ? W / 2 : (i * W) / (n - 1));
-    const y = (w: number) => H - (w / 100) * H;
-    const pts = analysis.evals.map((e, i) => `${x(i).toFixed(1)},${y(winPercent(e)).toFixed(1)}`);
-    const area = `M0,${H} L${pts.join(' L')} L${W},${H} Z`;
-    const dots = (result?.moves ?? [])
-      .filter((m) => m.judgement === 'mistake' || m.judgement === 'blunder' || m.judgement === 'inaccuracy')
-      .map((m) => ({ ply: m.ply, kind: m.judgement, x: x(m.ply), y: y(winPercent(analysis!.evals[m.ply]!)) }));
-    return { W, H, area, line: `M${pts.join(' L')}`, dots, cursor: x(ply), mid: H / 2 };
+  /** The moves worth stopping at: brilliancies and errors. */
+  const KEY: ReadonlySet<Judgement> = new Set(['brilliant', 'inaccuracy', 'mistake', 'blunder']);
+  const keyPlies = $derived((result?.moves ?? []).filter((m) => KEY.has(m.judgement)).map((m) => m.ply));
+  const prevKey = $derived([...keyPlies].reverse().find((p) => p < ply) ?? null);
+  const nextKey = $derived(keyPlies.find((p) => p > ply) ?? null);
+
+  // Timeline: White's winning chances after every move, with the key moves marked.
+  const TL_H = 64;
+  const timeline = $derived.by(() => {
+    if (!game) return null;
+    const W = Math.max(160, Math.round(timelineWidth));
+    const n = game.moves.length;
+    const x = (i: number) => (n === 0 ? W / 2 : (i * W) / n);
+    const y = (w: number) => TL_H - (w / 100) * TL_H;
+    const evals = analysis?.evals ?? [];
+    const pts = evals.map((e, i) => `${x(i).toFixed(1)},${y(winPercent(e)).toFixed(1)}`);
+    const marks = (result?.moves ?? []).filter((m) => KEY.has(m.judgement)).map((m) => ({ ply: m.ply, kind: m.judgement, x: x(m.ply), y: y(winPercent(evals[m.ply]!)) }));
+    return { W, n, x, area: pts.length ? `M0,${TL_H} L${pts.join(' L')} L${W},${TL_H} Z` : '', marks };
   });
 
-  function pickFromGraph(e: MouseEvent) {
-    if (!analysis || !graph) return;
-    const r = (e.currentTarget as SVGElement).getBoundingClientRect();
-    const i = Math.round(((e.clientX - r.left) / r.width) * (analysis.evals.length - 1));
-    ply = Math.max(0, Math.min(analysis.evals.length - 1, i));
+  function plyAt(e: PointerEvent): number {
+    const r = (e.currentTarget as Element).getBoundingClientRect();
+    const n = game?.moves.length ?? 0;
+    return Math.max(0, Math.min(n, Math.round(((e.clientX - r.left) / r.width) * n)));
   }
+  let scrubbing = false;
+  function onTimelineDown(e: PointerEvent) {
+    scrubbing = true;
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    ply = plyAt(e);
+  }
+  function onTimelineMove(e: PointerEvent) {
+    const p = plyAt(e);
+    hover = p;
+    if (scrubbing) ply = p;
+  }
+  function onTimelineUp() {
+    scrubbing = false;
+  }
+
+  const moveName = (p: number) => {
+    const m = game?.moves[p - 1];
+    if (!m) return 'Start';
+    const firstMove = Number(game!.startFen.split(' ')[5]) || 1;
+    const offset = game!.moves[0]?.color === 'b' ? 1 : 0;
+    const n = firstMove + Math.floor((p - 1 + offset) / 2);
+    return `${n}${m.color === 'w' ? '.' : '…'} ${m.san}`;
+  };
+  const hoverLabel = $derived.by(() => {
+    if (hover === null || !game) return null;
+    const j = result?.moves[hover - 1]?.judgement;
+    return `${moveName(hover)}${j && j !== 'good' && j !== 'neutral' ? ` ${JUDGEMENT_GLYPH[j]}` : ''}`;
+  });
 
   function onKeydown(e: KeyboardEvent) {
     if (!game) return;
@@ -129,6 +172,8 @@
     const n = game.moves.length;
     if (e.key === 'ArrowLeft') ply = Math.max(0, ply - 1);
     else if (e.key === 'ArrowRight') ply = Math.min(n, ply + 1);
+    else if (e.key === 'ArrowUp' && prevKey !== null) ply = prevKey;
+    else if (e.key === 'ArrowDown' && nextKey !== null) ply = nextKey;
     else if (e.key === 'Home') ply = 0;
     else if (e.key === 'End') ply = n;
     else if (e.key === 'f' || e.key === 'F') orientation = orientation === 'white' ? 'black' : 'white';
@@ -137,6 +182,44 @@
   }
 
   const pct = (v: number) => `${Math.round(v)}%`;
+
+  // The rows of the summary, best first; the side that did better on a row is marked.
+  const rows = $derived.by(() => {
+    if (!result) return [];
+    const s = result.sides;
+    const mark = (stat: Judgement | 'accuracy') => betterSide(s, stat);
+    return [
+      { key: 'accuracy', label: 'Accuracy', glyph: '', you: pct(s[youSide].accuracy), bot: pct(s[botSide].accuracy), better: mark('accuracy') },
+      ...JUDGEMENTS.map((j) => ({ key: j, label: JUDGEMENT_LABEL[j], glyph: JUDGEMENT_GLYPH[j], you: String(s[youSide].counts[j]), bot: String(s[botSide].counts[j]), better: mark(j) }))
+    ];
+  });
+
+  function save(name: string, text: string, type: string) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  const ratingState = $derived.by((): 'rated' | 'removed' | 'casual' => {
+    if (!game || !rating.isInLedger(game.id)) return 'casual';
+    return rating.excluded.has(game.id) ? 'removed' : 'rated';
+  });
+  async function toggleRating() {
+    if (!game) return;
+    const out = ratingState === 'rated';
+    await rating.setExcluded(game.id, out);
+    message = out ? 'Taken out of your rating.' : 'Counts for your rating again.';
+  }
+  async function copy() {
+    if (!game) return;
+    try {
+      await navigator.clipboard.writeText(game.pgn);
+      message = 'PGN copied.';
+    } catch {
+      message = 'Copying is not allowed here; use PGN.';
+    }
+  }
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -147,99 +230,142 @@
   {:else if game}
     <div class="review" data-state={progress ? 'running' : analysis ? 'done' : failure ? 'failed' : 'idle'}>
       <div class="board-col">
-        <div class="bar" role="img" aria-label="Evaluation {shown ? formatEval(shown) : 'unknown'}">
-          <span class="black-part" style="height:{100 - whiteShare}%"></span>
-          <span class="bar-label" class:top={whiteShare < 50}>{shown ? formatEval(shown) : ''}</span>
+        <div class="board-row">
+          <div class="bar" role="img" aria-label="Evaluation {shown ? formatEval(shown) : 'unknown'}">
+            <span class="black-part" style="height:{100 - whiteShare}%"></span>
+            <span class="bar-label" class:top={whiteShare < 50}>{shown ? formatEval(shown) : ''}</span>
+          </div>
+          <div class="board-wrap">
+            <Board
+              fen={fens[ply] ?? game.startFen}
+              {orientation}
+              turnColor={fens[ply]?.split(' ')[1] === 'b' ? 'black' : 'white'}
+              dests={new Map()}
+              {lastMove}
+              check={false}
+              coordinates={settings.value.coordinates}
+              showDests={false}
+              palette={boardPalette(settings.value.colours)}
+              pieceSet={settings.value.pieceSet}
+              animate={!ui.reducedMotion}
+              viewOnly
+              {hints}
+              label="Review board, move {ply} of {game.moves.length}"
+              onmove={() => undefined}
+            />
+          </div>
         </div>
-        <div class="board-wrap">
-          <Board
-            fen={fens[ply] ?? game.startFen}
-            {orientation}
-            turnColor={fens[ply]?.split(' ')[1] === 'b' ? 'black' : 'white'}
-            dests={new Map()}
-            {lastMove}
-            check={false}
-            coordinates={settings.value.coordinates}
-            showDests={false}
-            palette={boardPalette(settings.value.colours)}
-            pieceSet={settings.value.pieceSet}
-            animate={!ui.reducedMotion}
-            viewOnly
-            {hints}
-            label="Review board, move {ply} of {game.moves.length}"
-            onmove={() => undefined}
-          />
-        </div>
+
+        {#if timeline}
+          <div class="timeline" bind:clientWidth={timelineWidth}>
+            <svg
+              width={timeline.W}
+              height={TL_H}
+              viewBox="0 0 {timeline.W} {TL_H}"
+              preserveAspectRatio="none"
+              role="slider"
+              tabindex="0"
+              aria-label="Timeline"
+              aria-valuemin={0}
+              aria-valuemax={timeline.n}
+              aria-valuenow={ply}
+              aria-valuetext={moveName(ply)}
+              onpointerdown={onTimelineDown}
+              onpointermove={onTimelineMove}
+              onpointerup={onTimelineUp}
+              onpointercancel={onTimelineUp}
+              onpointerleave={() => (hover = null)}
+            >
+              <rect x="0" y="0" width={timeline.W} height={TL_H} class="g-black" />
+              {#if timeline.area}<path d={timeline.area} class="g-white" />{/if}
+              <line x1="0" x2={timeline.W} y1={TL_H / 2} y2={TL_H / 2} class="g-mid" />
+              {#if hover !== null}
+                <line x1={timeline.x(hover)} x2={timeline.x(hover)} y1="0" y2={TL_H} class="g-hover" />
+              {/if}
+              {#each timeline.marks as m (m.ply)}
+                <circle cx={m.x} cy={m.y} r="4" class="g-dot note-{m.kind}" />
+              {/each}
+              <line x1={timeline.x(ply)} x2={timeline.x(ply)} y1="0" y2={TL_H} class="g-cursor" />
+            </svg>
+            <div class="tl-labels">
+              <span>{moveName(ply)}</span>
+              {#if hoverLabel !== null && hover !== ply}<span class="tl-hover">{hoverLabel}</span>{/if}
+            </div>
+          </div>
+        {/if}
       </div>
 
       <aside class="side">
         <div class="meta">
-          <span class="name">{game.botName}</span>
-          <span class="note">
-            {new Date(game.startedAt).toLocaleDateString()} · {formatTimeControl(game.timeControl)} · {game.outcome ? describeTermination(game.outcome) : ''}
-            {#if opening}<br />{opening.eco} {opening.name}{/if}
-          </span>
+          <div class="meta-top">
+            <span class="name">{game.botName}</span>
+            <span class="actions">
+              <button type="button" onclick={() => save(`dither-${game!.startedAt.slice(0, 10)}-${game!.id.slice(0, 6)}.pgn`, game!.pgn, 'application/x-chess-pgn')}>PGN</button>
+              {#if settings.value.devMode}<button type="button" onclick={copy}>Copy PGN</button>{/if}
+              {#if ratingState !== 'casual'}
+                <button type="button" onclick={toggleRating}>{ratingState === 'rated' ? 'Remove from rating' : 'Count for rating again'}</button>
+              {/if}
+            </span>
+          </div>
+          <span class="line">{new Date(game.startedAt).toLocaleDateString()} · {formatTimeControl(game.timeControl)} · {game.outcome ? describeTermination(game.outcome) : ''}</span>
+          <span class="line" title={opening ? `${opening.eco} ${opening.name}` : undefined}>{opening ? `${opening.eco} ${opening.name}` : ' '}</span>
+          {#if message}<span class="line ok" role="status">{message}</span>{/if}
         </div>
 
-        {#if progress}
-          <div class="progress" role="status">
-            <span class="label">Analysing with {ENGINE_NAME} · {progress.done}/{progress.total}</span>
-            <span class="track"><span style="width:{(progress.done / progress.total) * 100}%"></span></span>
-            <button type="button" onclick={() => stopper?.abort()}>Stop</button>
-          </div>
-        {:else if failure}
-          <p class="note" role="alert">The analysis stopped: {failure}</p>
-          <button type="button" class="action" onclick={() => game && run(game)}>Try again</button>
-        {:else if !analysis}
-          <button type="button" class="action" onclick={() => game && run(game)}>Analyse</button>
-        {/if}
+        <div class="summary">
+          {#if progress}
+            <div class="progress" role="status">
+              <span class="label">Analysing with {ENGINE_NAME} · {progress.done}/{progress.total}</span>
+              <span class="track"><span style="width:{(progress.done / progress.total) * 100}%"></span></span>
+              <button type="button" onclick={() => stopper?.abort()}>Stop</button>
+            </div>
+          {:else if failure}
+            <p class="note" role="alert">The analysis stopped: {failure}</p>
+            <button type="button" class="action" onclick={() => game && run(game)}>Try again</button>
+          {:else if !analysis}
+            <button type="button" class="action" onclick={() => game && run(game)}>Analyse</button>
+          {/if}
 
-        {#if result}
-          <table class="sides" data-testid="review-summary">
-            <thead>
-              <tr><th scope="col"></th><th scope="col">You</th><th scope="col">Bot</th></tr>
-            </thead>
-            <tbody>
-              <tr><th scope="row">Accuracy</th><td>{pct(result.sides[youSide].accuracy)}</td><td>{pct(result.sides[botSide].accuracy)}</td></tr>
-              <tr><th scope="row">Avg. centipawn loss</th><td>{result.sides[youSide].acpl}</td><td>{result.sides[botSide].acpl}</td></tr>
-              <tr><th scope="row"><span class="glyph note-inaccuracy">?!</span> Inaccuracies</th><td>{result.sides[youSide].inaccuracies}</td><td>{result.sides[botSide].inaccuracies}</td></tr>
-              <tr><th scope="row"><span class="glyph note-mistake">?</span> Mistakes</th><td>{result.sides[youSide].mistakes}</td><td>{result.sides[botSide].mistakes}</td></tr>
-              <tr><th scope="row"><span class="glyph note-blunder">??</span> Blunders</th><td>{result.sides[youSide].blunders}</td><td>{result.sides[botSide].blunders}</td></tr>
-              <tr><th scope="row"><span class="glyph note-best">★</span> Best moves</th><td>{result.sides[youSide].best}</td><td>{result.sides[botSide].best}</td></tr>
-            </tbody>
-          </table>
-        {/if}
-
-        {#if graph}
-          <figure class="graph" bind:clientWidth={graphWidth}>
-            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-            <svg width={graph.W} height={graph.H} viewBox="0 0 {graph.W} {graph.H}" role="img" aria-label="White's winning chances over the game; arrow keys step through the moves" onclick={pickFromGraph}>
-              <rect x="0" y="0" width={graph.W} height={graph.H} class="g-black" />
-              <path d={graph.area} class="g-white" />
-              <line x1="0" x2={graph.W} y1={graph.mid} y2={graph.mid} class="g-mid" />
-              <line x1={graph.cursor} x2={graph.cursor} y1="0" y2={graph.H} class="g-cursor" />
-              {#each graph.dots as d (d.ply)}
-                <circle cx={d.x} cy={d.y} r="3.2" class="g-dot note-{d.kind}" />
-              {/each}
-            </svg>
-          </figure>
-        {/if}
+          {#if result}
+            <table class="sides" data-testid="review-summary">
+              <thead>
+                <tr><th scope="col"></th><th scope="col">You</th><th scope="col">Bot</th></tr>
+              </thead>
+              <tbody>
+                {#each rows as r (r.key)}
+                  <tr class:first={r.key === 'accuracy'}>
+                    <th scope="row"><span class="glyph note-{r.key}" aria-hidden="true">{r.glyph}</span>{r.label}</th>
+                    <td><span class:better={r.better === youSide}>{r.you}</span></td>
+                    <td><span class:better={r.better === botSide}>{r.bot}</span></td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          {/if}
+        </div>
 
         <div class="explain" aria-live="polite">
           {#if current && result}
+            {@const before = analysis!.evals[current.ply - 1]!}
             <p>
-              <strong>{Math.ceil(current.ply / 2)}{current.color === 'w' ? '.' : '…'} {current.san}</strong>
-              {#if current.judgement !== 'good'}<span class="note-{current.judgement}">{JUDGEMENT_GLYPH[current.judgement]} {LABEL[current.judgement]}</span>{/if}
-              <span class="who">({current.color === youSide ? 'you' : 'bot'})</span>
+              <strong>{moveName(current.ply)}</strong>
+              <span class="note-{current.judgement}"><span class="glyph" aria-hidden="true">{JUDGEMENT_GLYPH[current.judgement]}</span>{JUDGEMENT_LABEL[current.judgement]}</span>
+              <span class="who">· {current.color === youSide ? 'you' : 'bot'}</span>
             </p>
-            {#if current.judgement !== 'best' && current.bestSan}
-              <p class="note">
-                Best was <strong>{current.bestSan}</strong> ({formatEval(analysis!.evals[current.ply - 1]!)}){#if analysis!.evals[current.ply - 1]!.pv.length > 1}: {lineSan(fens[current.ply - 1]!, analysis!.evals[current.ply - 1]!.pv)}{/if}.
-                Win chance {pct(current.winBefore)} → {pct(current.winAfter)}.
-              </p>
+            {#if current.judgement === 'book'}
+              <p class="note">Opening theory{opening && current.ply <= opening.ply ? `: ${opening.name}` : ''}.</p>
+            {:else if current.best === current.uci}
+              <p class="note">The engine's choice. Win chance {pct(current.winBefore)} → {pct(current.winAfter)}.</p>
+            {:else if current.bestSan}
+              <p class="note">Best was <strong>{current.bestSan}</strong> ({formatEval(before)}). Win chance {pct(current.winBefore)} → {pct(current.winAfter)}.</p>
+            {:else}
+              <p class="note">Win chance {pct(current.winBefore)} → {pct(current.winAfter)}.</p>
             {/if}
+            <p class="note">{#if current.best !== current.uci && before.pv.length > 1}Line: {lineSan(fens[current.ply - 1]!, before.pv)}{/if}</p>
           {:else if shown?.best && analysis}
-            <p class="note">Start position. Engine line: {lineSan(fens[ply]!, shown.pv)}</p>
+            <p><strong>Start</strong></p>
+            <p class="note">Engine line: {lineSan(fens[ply]!, shown.pv)}</p>
+            <p class="note"></p>
           {/if}
         </div>
 
@@ -259,10 +385,12 @@
           <button type="button" onclick={() => (ply = Math.max(0, ply - 1))} aria-label="Previous move">◀</button>
           <button type="button" onclick={() => (ply = Math.min(game!.moves.length, ply + 1))} aria-label="Next move">▶</button>
           <button type="button" onclick={() => (ply = game!.moves.length)} aria-label="Last move">▶|</button>
+          <button type="button" disabled={prevKey === null} onclick={() => prevKey !== null && (ply = prevKey)} title="Previous key move (↑)">◀ Key</button>
+          <button type="button" disabled={nextKey === null} onclick={() => nextKey !== null && (ply = nextKey)} title="Next key move (↓)">Key ▶</button>
           <button type="button" onclick={() => (orientation = orientation === 'white' ? 'black' : 'white')}>Flip</button>
         </div>
-        {#if analysis}
-          <p class="note small">{analysis.engine}, depth {analysis.depth}. Accuracy and judgements follow Lichess's method. The engine only reviews; it never plays you.</p>
+        {#if analysis && settings.value.devMode}
+          <p class="note small">{analysis.engine}, depth {analysis.depth}</p>
         {/if}
       </aside>
     </div>
@@ -271,16 +399,25 @@
 
 <style>
   .review {
-    --board: max(260px, min(calc(100dvh - var(--gutter) * 3.2 - 140px), 62vw, 680px));
+    /* The page fits the window: the board takes the height left after the frame and timeline. */
+    --h: max(520px, calc(100dvh - var(--gutter) * 4.2 - 92px));
+    --timeline: 86px;
+    --board: max(240px, min(calc(var(--h) - var(--timeline)), calc(min(1180px, 100vw - 2 * var(--gutter)) - 440px), 680px));
     display: grid;
-    grid-template-columns: minmax(0, auto) minmax(260px, 360px);
+    grid-template-columns: auto minmax(300px, 1fr);
     gap: 26px;
-    align-items: start;
+    height: var(--h);
+    align-items: stretch;
   }
   .board-col {
     display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: calc(var(--board) + 22px);
+  }
+  .board-row {
+    display: flex;
     gap: 8px;
-    justify-content: center;
   }
   .board-wrap {
     width: var(--board);
@@ -293,6 +430,7 @@
     border: var(--hairline) solid var(--panel-ink);
     border-radius: var(--radius);
     overflow: hidden;
+    flex: none;
   }
   .black-part {
     position: absolute;
@@ -315,22 +453,114 @@
     top: 4px;
     color: var(--eval-white);
   }
+  .timeline svg {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    cursor: ew-resize;
+    touch-action: none;
+    border: var(--hairline) solid var(--panel-ink);
+    border-radius: var(--radius);
+  }
+  .timeline svg:focus-visible {
+    outline: 2px solid var(--panel-ink);
+    outline-offset: 2px;
+  }
+  .tl-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0.03em;
+    min-height: 1.4em;
+  }
+  .tl-hover {
+    color: var(--panel-muted);
+  }
+  .g-black {
+    fill: var(--eval-black);
+  }
+  .g-white {
+    fill: var(--eval-white);
+  }
+  .g-mid {
+    stroke: var(--eval-mid);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+  }
+  .g-cursor {
+    stroke: var(--flag);
+    stroke-width: 2;
+  }
+  .g-hover {
+    stroke: var(--eval-mid);
+    stroke-width: 1;
+  }
+  .g-dot {
+    stroke: var(--eval-white);
+    stroke-width: 1;
+  }
+  .g-dot.note-brilliant {
+    fill: var(--review-brilliant);
+  }
+  .g-dot.note-inaccuracy {
+    fill: var(--review-inaccuracy);
+  }
+  .g-dot.note-mistake {
+    fill: var(--review-mistake);
+  }
+  .g-dot.note-blunder {
+    fill: var(--review-blunder);
+  }
   .side {
     min-width: 0;
-    display: grid;
-    gap: 14px;
-    align-content: start;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
   .meta {
     display: grid;
-    gap: 4px;
+    gap: 3px;
+    min-width: 0;
+  }
+  .meta-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
   }
   .name {
     font-family: var(--font-display);
     font-weight: 800;
     font-size: 20px;
     text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    flex: none;
+  }
+  .actions button {
+    font-size: 11px;
+    text-decoration: underline;
+    text-underline-offset: 0.3em;
+  }
+  .line {
+    font-size: var(--ui-size-small);
+    color: var(--panel-muted);
+    text-transform: none;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .line.ok {
+    color: var(--panel-ink);
   }
   .note {
     margin: 0;
@@ -345,6 +575,11 @@
   }
   .small {
     font-size: 11px;
+  }
+  .summary {
+    display: grid;
+    gap: 8px;
+    flex: none;
   }
   .progress {
     display: grid;
@@ -373,6 +608,10 @@
     border-radius: var(--radius);
     font-size: 12px;
   }
+  .controls button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
   .action {
     justify-self: start;
   }
@@ -383,23 +622,60 @@
   }
   .sides th,
   .sides td {
-    padding: 4px 6px 4px 0;
+    padding: 0 6px 0 0;
     text-align: left;
     font-weight: 400;
-    border-bottom: var(--hairline) solid color-mix(in srgb, var(--panel-muted) 35%, transparent);
+    font-size: 11px;
+    line-height: 1.55;
+    border-bottom: var(--hairline) solid color-mix(in srgb, var(--panel-muted) 30%, transparent);
   }
   .sides thead th {
     color: var(--panel-muted);
   }
   .sides td {
+    width: 22%;
     font-family: var(--font-display);
     font-weight: 800;
-    font-size: 15px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .sides tr.first td {
+    font-size: 16px;
+  }
+  /* The side that did better on a line, in white. */
+  .sides td span {
+    display: inline-block;
+    min-width: 2.4ch;
+    padding: 0 5px;
+    border-radius: var(--radius);
+  }
+  .sides td span.better {
+    background: #ffffff;
+    color: #111111;
+    box-shadow: 0 0 0 var(--hairline) var(--panel-ink);
   }
   .glyph {
     display: inline-block;
-    min-width: 2ch;
+    min-width: 2.6ch;
     font-weight: 700;
+  }
+  .note-brilliant {
+    color: var(--review-brilliant);
+  }
+  .note-excellent {
+    color: var(--review-excellent);
+  }
+  .note-best {
+    color: var(--review-best);
+  }
+  .note-good {
+    color: var(--review-good);
+  }
+  .note-book {
+    color: var(--review-book);
+  }
+  .note-neutral {
+    color: var(--panel-muted);
   }
   .note-inaccuracy {
     color: var(--review-inaccuracy);
@@ -410,63 +686,42 @@
   .note-blunder {
     color: var(--review-blunder);
   }
-  .note-best {
-    color: var(--review-best);
-  }
-  .graph {
-    margin: 0;
-  }
-  .graph svg {
-    display: block;
-    cursor: pointer;
-    border: var(--hairline) solid var(--panel-ink);
-    border-radius: var(--radius);
-  }
-  .g-black {
-    fill: var(--eval-black);
-  }
-  .g-white {
-    fill: var(--eval-white);
-  }
-  .g-mid {
-    stroke: var(--eval-mid);
-    stroke-width: 1;
-    stroke-dasharray: 2 3;
-  }
-  .g-cursor {
-    stroke: var(--flag);
-    stroke-width: 1.5;
-  }
-  .g-dot.note-inaccuracy {
-    fill: var(--review-inaccuracy);
-  }
-  .g-dot.note-mistake {
-    fill: var(--review-mistake);
-  }
-  .g-dot.note-blunder {
-    fill: var(--review-blunder);
-  }
-  .g-dot {
-    stroke: var(--eval-white);
-    stroke-width: 1;
+  /* Three lines, always: the panel never changes height as the moves change. */
+  .explain {
+    flex: none;
+    height: calc(3 * 1.5em);
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
   }
   .explain p {
-    margin: 0 0 4px;
-    font-size: 13px;
+    margin: 0;
+    height: 1.5em;
+    font-size: inherit;
     text-transform: none;
     letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .explain p.note {
+    font-size: 12px;
+  }
+  .explain .glyph {
+    min-width: 0;
+    margin: 0 4px 0 6px;
   }
   .who {
     color: var(--panel-muted);
   }
   .moves {
-    max-height: 30vh;
+    flex: 1;
+    min-height: 60px;
     display: flex;
     flex-direction: column;
     border-top: var(--hairline) solid color-mix(in srgb, var(--panel-muted) 50%, transparent);
     border-bottom: var(--hairline) solid color-mix(in srgb, var(--panel-muted) 50%, transparent);
     padding: 6px 0;
-    min-height: 0;
   }
   .moves :global(ol) {
     flex: 1;
@@ -475,14 +730,20 @@
   .controls {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
+    flex: none;
   }
   @media (max-width: 900px) {
     .review {
-      grid-template-columns: 1fr;
-    }
-    .review {
       --board: min(calc(100vw - 2 * var(--gutter) - 80px), 72dvh);
+      grid-template-columns: 1fr;
+      height: auto;
+    }
+    .board-col {
+      margin: 0 auto;
+    }
+    .moves {
+      max-height: 40vh;
     }
   }
 </style>

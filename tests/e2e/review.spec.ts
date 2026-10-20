@@ -68,23 +68,39 @@ test('reviews a finished game with Stockfish and keeps the review', async ({ pag
   await seed(page, finishedGame());
 
   await page.goto('/#/history');
-  await page.getByRole('button', { name: 'Details' }).click();
-  await page.getByRole('link', { name: 'Review with Stockfish' }).click();
+  await page.getByRole('link', { name: 'Review' }).click();
 
   const review = page.locator('.review');
   await expect(review).toHaveAttribute('data-state', 'done', { timeout: 120_000 });
   const summary = page.getByTestId('review-summary');
   await expect(summary).toContainText('Accuracy');
+  // Best classes first; the side that did better on a line is marked.
+  const labels = await summary.locator('tbody th').allInnerTexts();
+  expect(labels.map((l) => l.replace(/[^A-Za-z]/g, '').toLowerCase())).toEqual([
+    'accuracy', 'brilliant', 'excellent', 'best', 'good', 'book', 'neutral', 'inaccuracy', 'mistake', 'blunder'
+  ]);
+  await expect(summary.locator('.better').first()).toBeVisible();
+  // The page fits the window: no scrolling.
+  expect(await page.locator('.frame').evaluate((f) => f.scrollHeight <= f.clientHeight + 1)).toBe(true);
   // The finishing move is the best move; Black's last move (…Nf6??) allowed mate.
   await expect(page.locator('ol.moves button', { hasText: 'Nf6' })).toHaveClass(/note-blunder/);
   await expect(page.locator('ol.moves button', { hasText: 'Qxf7#' })).toHaveClass(/note-best/);
   await page.locator('ol.moves button', { hasText: 'Nf6' }).click();
   await expect(page.locator('.explain')).toContainText('Blunder');
   await expect(page.locator('.explain')).toContainText('Best was');
+  // The explanation keeps its height whatever it says.
+  const h1 = await page.locator('.explain').evaluate((e) => e.getBoundingClientRect().height);
+  await page.locator('ol.moves button', { hasText: 'Qxf7#' }).click();
+  expect(await page.locator('.explain').evaluate((e) => e.getBoundingClientRect().height)).toBe(h1);
+  // Book moves are marked; the timeline scrubs to a move.
+  await expect(page.locator('ol.moves button', { hasText: /^e4/ }).first()).toHaveClass(/note-book/);
+  const tl = page.getByRole('slider', { name: 'Timeline' });
+  const box = (await tl.boundingBox())!;
+  await page.mouse.click(box.x + 2, box.y + box.height / 2);
+  await expect(tl).toHaveAttribute('aria-valuenow', '0');
 
   // Opening the review again does not re-run the engine.
   await page.goto('/#/history');
-  await page.getByRole('button', { name: 'Details' }).click();
-  await page.getByRole('link', { name: 'Open review' }).click();
+  await page.getByRole('link', { name: 'Review' }).click();
   await expect(review).toHaveAttribute('data-state', 'done', { timeout: 5_000 });
 });

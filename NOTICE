@@ -5,8 +5,9 @@ This program is free software: you can redistribute it and/or modify it under th
 the GNU Affero General Public License as published by the Free Software Foundation, either
 version 3 of the License, or (at your option) any later version. See LICENSE.
 
-The project is AGPL-3.0 because it distributes the Maia-3 model (AGPL-3.0) and the fastelo
-model (GPL-3.0). Third-party components and data are listed below with their licences.
+The project is AGPL-3.0 because it distributes the Maia-3 model and code derived from Maia-3
+(AGPL-3.0), alongside GPL-3.0 components (chessground, Stockfish). Third-party components and
+data are listed below with their licences.
 
 ------------------------------------------------------------------------------------------
 Fonts (bundled in public/fonts)
@@ -28,9 +29,11 @@ svelte 5                         MIT                         (c) Svelte contribu
 Code ported into this project (src/), under the original licences:
   src/chess/rules.ts      "cannot mate" test after scalachess InsufficientMatingMaterial
                           (MIT, lichess.org)
-  src/inference/*         input encodings of fastelo (GPL-3.0), Maia-3 (AGPL-3.0) and
-                          Maia-2 (MIT); fastelo's calibration settings() (GPL-3.0)
-  src/rating/moveQuality  fastelo's Rater: likelihood.py and response.py (GPL-3.0)
+  src/inference/*         Maia-3's input encoding (AGPL-3.0)
+  src/analysis/review.ts  win chances and accuracy after lila's WinPercent and
+                          AccuracyPercent (AGPL-3.0, lichess.org)
+  tools/calibrate         fastelo's calibration method, calibrate.py (GPL-3.0); tool only,
+                          not part of the app
 
 Desktop app (src-tauri), in addition:
 Tauri 2 and tauri-plugin-sql     MIT OR Apache-2.0           (c) Tauri Programme within
@@ -45,19 +48,10 @@ Microsoft Edge WebView2 Runtime  Microsoft software licence  included as the off
 ------------------------------------------------------------------------------------------
 Models (downloaded or bundled as model packs; see models/manifest.json)
 ------------------------------------------------------------------------------------------
-fastelo                          GPL-3.0                     irsotarriva
-  https://huggingface.co/irsotarriva/fastelo   code: https://github.com/irsotarriva/fastelo
-  Trained on the Lichess open database (CC0); distilled from Leela Chess Zero
-  T1-256x10-distilled-swa-2432500 (GPL-3.0), which is not redistributed.
-Maia-3                           AGPL-3.0 (code and weights) University of Toronto CSSLab
-  https://huggingface.co/UofTCSSLab/Maia3-5M   code: https://github.com/CSSLab/maia3
+Maia-3 23M                       AGPL-3.0 (code and weights) University of Toronto CSSLab
+  https://huggingface.co/UofTCSSLab/Maia3-23M   code: https://github.com/CSSLab/maia3
   Paper: Monroe, Eilender, Chalmers, Tang, Anderson. "Chessformer: A Unified Architecture
   for Chess Modeling." ICLR 2026.
-Maia-2 (rapid)                   MIT                         University of Toronto CSSLab
-  https://github.com/CSSLab/maia2; ONNX export from
-  https://github.com/CSSLab/maia-platform-frontend (GPL-3.0)
-  Paper: Tang, Jiao, McIlroy-Young, Kleinberg, Sen, Anderson. "Maia-2: A Unified Model for
-  Human-AI Alignment in Chess." NeurIPS 2024.
 
 ------------------------------------------------------------------------------------------
 Game review engine (bundled, vendor/stockfish)
