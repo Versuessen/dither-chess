@@ -24,7 +24,9 @@ test('the home screen is a main menu on a phone', async ({ page }) => {
   for (const name of ['History', 'Rating', 'Models', 'Settings']) {
     await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name })).toBeVisible();
   }
-  // The opponents follow under Play, smaller.
+  // Play, then Opponents (opening the list) and Puzzles; the opponents are smaller than Play.
+  await expect(page.getByRole('link', { name: 'Puzzles' })).toBeVisible();
+  await page.getByRole('button', { name: 'Opponents' }).tap();
   const first = page.locator('[data-persona="loose-ends"]');
   await expect(first).toBeVisible();
   const playSize = await play.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));

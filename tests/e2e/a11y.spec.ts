@@ -30,6 +30,12 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       await audit(page, route);
     }
+    await page.goto('/#/puzzles');
+    await expect(page.locator('.puzzles')).toHaveAttribute('data-state', 'solving', { timeout: 30_000 });
+    await audit(page, 'puzzles');
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Opponents' }).click();
+    await audit(page, 'home with opponents');
     await page.goto('/#/bot/grinder');
     await expect(page.getByRole('dialog')).toBeVisible();
     await audit(page, 'bot profile');

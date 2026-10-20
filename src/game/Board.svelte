@@ -38,6 +38,8 @@
     premoving?: boolean;
     /** Arrows set by the app (the engine's best move in a review), drawn under the player's own. */
     hints?: { from: Key; to: Key }[];
+    /** Squares the app marks (a puzzle hint), in the marked-square colour. */
+    marked?: Key[];
     /** A mark on a square's corner (the class of the move shown in a review). */
     badge?: { square: Key; glyph: string; kind: string; label: string };
     onmove: (orig: Key, dest: Key) => void;
@@ -144,7 +146,8 @@
   const highlights = $derived(
     new Map<Key, string>([
       ...(props.queued ?? []).flatMap(([a, b]) => [[a, 'current-premove'] as const, [b, 'current-premove'] as const]),
-      ...marks.map((k) => [k, 'marked'] as const)
+      ...marks.map((k) => [k, 'marked'] as const),
+      ...(props.marked ?? []).map((k) => [k, 'marked'] as const)
     ])
   );
 

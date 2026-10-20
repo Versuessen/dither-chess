@@ -8,7 +8,8 @@ export type Route =
   | { name: 'analysis'; game: string }
   | { name: 'rating' }
   | { name: 'models' }
-  | { name: 'settings' };
+  | { name: 'settings' }
+  | { name: 'puzzles' };
 
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#/, '').replace(/^\/+/, '');
@@ -23,6 +24,7 @@ export function parseRoute(hash: string): Route {
     case 'rating':
     case 'models':
     case 'settings':
+    case 'puzzles':
       return { name: head };
     default:
       return { name: 'home' };

@@ -46,6 +46,7 @@ test.describe('reduced motion', () => {
   test('the dither stays still and image swaps are instant', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await booted(page);
+    await page.getByRole('button', { name: 'Opponents' }).click();
     await page.waitForTimeout(400);
     const before = await frames(page);
     await page.waitForTimeout(1500);
@@ -104,7 +105,16 @@ test.describe('home and bot profile', () => {
   test('the roster opens a focus-trapped profile panel that Esc closes', async ({ page }) => {
     await booted(page);
     expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
+    // The opponents open under their own menu item, six at a time.
+    const opponents = page.getByRole('button', { name: 'Opponents' });
+    await expect(opponents).toHaveAttribute('aria-expanded', 'false');
+    await opponents.click();
+    await expect(opponents).toHaveAttribute('aria-expanded', 'true');
+    const list = page.locator('#roster-list');
+    await expect(list).not.toHaveClass(/fade-top/);
+    await expect(list).toHaveClass(/fade-bottom/);
     const row = page.locator('button[data-persona="outpost"]');
+    await row.scrollIntoViewIfNeeded();
     await row.hover();
     await expect(page.locator('canvas.dither')).toHaveAttribute('data-subject', 'outpost');
     await row.click();

@@ -12,6 +12,7 @@
   const loadHistory = () => import('./screens/History.svelte');
   const loadAnalysis = () => import('./screens/Analysis.svelte');
   const loadGame = () => import('./screens/Game.svelte');
+  const loadPuzzles = () => import('./screens/Puzzles.svelte');
   import { createOpponent } from './inference/opponents';
   import { notifyFinished } from './game/finalize';
   import { storage } from './storage';
@@ -38,7 +39,7 @@
   // The game screen calms the background; every other screen keeps it alive.
   $effect(() => {
     if (booting) return;
-    ui.mode = route.name === 'game' ? 'calm' : 'live';
+    ui.mode = route.name === 'game' || route.name === 'puzzles' ? 'calm' : 'live';
   });
 
   $effect(() => {
@@ -117,6 +118,8 @@
       <div class="screen" class:booting><Analysis gameId={route.game} /></div>
     {/await}
   {/key}
+{:else if route.name === 'puzzles' && boot.dataReady}
+  {#await loadPuzzles() then { default: Puzzles }}<div class="screen" class:booting><Puzzles /></div>{/await}
 {:else if route.name === 'game' && session.pending && !booting}
   {#key session.gameNo}
     {#await loadGame() then { default: Game }}

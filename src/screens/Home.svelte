@@ -1,5 +1,10 @@
+<script lang="ts" module>
+  /** The opponents list stays open or closed for the session, across visits to other screens. */
+  let rosterOpen = false;
+</script>
+
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { PERSONAS, CUSTOM, type Persona } from '../bots/personas';
   import { settings } from '../app/settings.svelte';
   import { ui } from '../app/ui.svelte';
@@ -13,9 +18,15 @@
   }
   let { covered = false }: Props = $props();
 
-  let list: HTMLUListElement;
+  let list: HTMLUListElement | undefined = $state();
   let leaveTimer: ReturnType<typeof setTimeout> | undefined;
   let visible = $state(1);
+  let open = $state(rosterOpen);
+  /** Fade an edge of the list only where there is more to scroll to. */
+  let fadeTop = $state(false);
+  let fadeBottom = $state(false);
+  /** The puzzles button shows a tactic. */
+  const PUZZLE_SUBJECT = 'fork';
   /** An opponent is hovered or focused: the background shows it and the rotation pauses. */
   let pointing = $state(false);
 
@@ -45,7 +56,22 @@
   });
 
   function seek(f: number) {
-    list.scrollTop = f * (list.scrollHeight - list.clientHeight);
+    if (list) list.scrollTop = f * (list.scrollHeight - list.clientHeight);
+  }
+
+  async function toggleRoster() {
+    open = !open;
+    rosterOpen = open;
+    if (open) {
+      await tick();
+      list?.querySelector<HTMLButtonElement>('button.row')?.focus({ preventScroll: true });
+    }
+  }
+
+  function showSubject(subject: string) {
+    clearTimeout(leaveTimer);
+    pointing = true;
+    ui.subject = subject;
   }
 
   function toggleDev() {
@@ -65,17 +91,21 @@
     leaveTimer = setTimeout(() => (pointing = false), 900);
   }
 
-  function open(p: Persona) {
+  function openPersona(p: Persona) {
     router.go({ name: 'bot', persona: p.id });
   }
 
   function onScroll() {
+    if (!list) return;
     const max = list.scrollHeight - list.clientHeight;
     ui.scroll = max > 0 ? list.scrollTop / max : 0;
     visible = list.scrollHeight > 0 ? list.clientHeight / list.scrollHeight : 1;
+    fadeTop = list.scrollTop > 2;
+    fadeBottom = list.scrollTop < max - 2;
   }
 
   function onKey(e: KeyboardEvent, index: number) {
+    if (!list) return;
     const rows = list.querySelectorAll<HTMLButtonElement>('button.row');
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
@@ -85,6 +115,7 @@
   }
 
   $effect(() => {
+    if (!list) return;
     onScroll();
     const ro = new ResizeObserver(onScroll);
     ro.observe(list);
@@ -106,41 +137,75 @@
     <LogoMark width="min(34vw, 500px)" tag="CHESS" />
   </div>
 
-  <section class="roster" aria-label="Choose an opponent">
-    <!-- The main action, outside the scrolling list: any rating, any settings. -->
+  <section class="roster" aria-label="Main menu">
+    <!-- The main action: any rating, any settings. -->
     <button
       class="row display play"
       onpointerenter={() => show(CUSTOM)}
       onpointerleave={leave}
       onfocus={() => show(CUSTOM)}
       onblur={leave}
-      onclick={() => open(CUSTOM)}
+      onclick={() => openPersona(CUSTOM)}
       data-persona={CUSTOM.id}
       data-sound="confirm"
     >
       <span class="name">Play</span>
     </button>
-    <ul id="roster-list" bind:this={list} onscroll={onScroll} onpointerleave={leave}>
-      {#each PERSONAS as p, i (p.id)}
-        <li>
-          <button
-            class="row display"
-            onpointerenter={() => show(p)}
-            onfocus={() => show(p)}
-            onblur={leave}
-            onclick={() => open(p)}
-            onkeydown={(e) => onKey(e, i)}
-            data-persona={p.id}
-          >
-            <span class="level">{p.level}</span>
-            <span class="name">{p.name}</span>
-          </button>
-        </li>
-      {/each}
-    </ul>
+
+    <button
+      class="row display menu-item opponents"
+      aria-expanded={open}
+      aria-controls="roster-list"
+      onclick={toggleRoster}
+    >
+      <span class="name">Opponents</span>
+      <span class="caret" aria-hidden="true">{open ? '−' : '+'}</span>
+    </button>
+    {#if open}
+      <ul
+        id="roster-list"
+        bind:this={list}
+        onscroll={onScroll}
+        onpointerleave={leave}
+        class:fade-top={fadeTop}
+        class:fade-bottom={fadeBottom}
+        aria-label="Opponents"
+      >
+        {#each PERSONAS as p, i (p.id)}
+          <li>
+            <button
+              class="row display"
+              onpointerenter={() => show(p)}
+              onfocus={() => show(p)}
+              onblur={leave}
+              onclick={() => openPersona(p)}
+              onkeydown={(e) => onKey(e, i)}
+              data-persona={p.id}
+            >
+              <span class="level">{p.level}</span>
+              <span class="name">{p.name}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
+    <a
+      class="row display menu-item puzzles"
+      href={href({ name: 'puzzles' })}
+      onpointerenter={() => showSubject(PUZZLE_SUBJECT)}
+      onpointerleave={leave}
+      onfocus={() => showSubject(PUZZLE_SUBJECT)}
+      onblur={leave}
+      data-sound="confirm"
+    >
+      <span class="name">Puzzles</span>
+    </a>
   </section>
 
-  <ScrollRail progress={ui.scroll} size={visible} controls="roster-list" label="Opponents" onseek={seek} />
+  {#if open}
+    <ScrollRail progress={ui.scroll} size={visible} controls="roster-list" label="Opponents" onseek={seek} />
+  {/if}
 
   <!-- The copyright sign also switches the developer details (PGN text and diagnostics) on and off. -->
   <button
@@ -162,6 +227,7 @@
     transition: opacity var(--t-panel) var(--ease-out);
     /* Play is the main action; the opponents are secondary, about 30% smaller (Overwatch's menu). */
     --play-size: calc(var(--display-size) * 1.3);
+    --menu-size: calc(var(--play-size) * 0.8);
     --row-size: calc(var(--play-size) * 0.68);
   }
   .home.covered {
@@ -221,13 +287,12 @@
     pointer-events: none;
   }
 
+  /* Anchored where the open menu is centred, so Play stays put when the list opens. */
   .roster {
     position: absolute;
     left: 0;
-    top: 50%;
-    transform: translateY(-50%);
+    top: max(9vh, calc(50vh - 4.9 * var(--display-size) - 2.5vh));
     width: min(50vw, 780px);
-    height: min(78vh, 880px);
     display: flex;
     flex-direction: column;
   }
@@ -235,24 +300,47 @@
     flex: none;
     font-size: var(--play-size);
   }
-  /* The list starts a clear step below Play and fades out well before the bottom. */
+  /* Opponents and Puzzles: large, but a step below Play. */
+  .menu-item {
+    flex: none;
+    font-size: var(--menu-size);
+    align-items: baseline;
+  }
+  .opponents {
+    margin-top: 2.2vh;
+  }
+  .caret {
+    margin-left: 0.15em;
+    font-size: 0.62em;
+    opacity: 0.7;
+  }
+  /* Six opponents at a time; an edge fades only where the list continues past it. */
   ul {
-    flex: 1;
-    min-height: 0;
+    --fade-top: 0%;
+    --fade-bottom: 0%;
+    flex: none;
+    height: calc(var(--row-size) * 1.12 * 6 + 1.4vh);
     list-style: none;
-    margin: 4.5vh 0 0;
-    padding: 2vh 0 16vh;
+    margin: 0.6vh 0 0.8vh;
+    padding: 0.7vh 0;
     overflow-y: auto;
     scrollbar-width: none;
     overscroll-behavior: contain;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 62%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 62%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+  }
+  ul.fade-top {
+    --fade-top: 22%;
+  }
+  ul.fade-bottom {
+    --fade-bottom: 22%;
   }
   ul::-webkit-scrollbar {
     display: none;
   }
   ul .row {
     font-size: var(--row-size);
+    line-height: 1.08;
   }
   .row {
     display: flex;
@@ -266,7 +354,8 @@
       transform var(--t-fast) var(--ease-out),
       color var(--t-fast) linear;
   }
-  .play.row {
+  .play.row,
+  .menu-item.row {
     color: var(--over-dither);
   }
   .row:hover,
@@ -317,20 +406,12 @@
     }
     .home {
       --play-size: 60px;
-      --row-size: 36px;
+      --menu-size: 46px;
+      --row-size: 34px;
     }
     .roster {
       width: 100vw;
       top: 33dvh;
-      bottom: 0;
-      transform: none;
-      height: auto;
-    }
-    ul {
-      margin-top: 2.5dvh;
-      padding: 1dvh 0 calc(10dvh + env(safe-area-inset-bottom));
-      -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 5%, #000 78%, transparent 100%);
-      mask-image: linear-gradient(to bottom, transparent 0, #000 5%, #000 78%, transparent 100%);
     }
     .year {
       font-size: 11px;
