@@ -20,7 +20,8 @@
     movableColor?: CgColor;
     dests: Dests;
     lastMove?: [Key, Key];
-    check: boolean;
+    /** The side whose king is in check (false: none). */
+    check: CgColor | false;
     coordinates: boolean;
     showDests: boolean;
     palette: BoardPalette;
@@ -36,6 +37,8 @@
     premoving?: boolean;
     /** Arrows set by the app (the engine's best move in a review), drawn under the player's own. */
     hints?: { from: Key; to: Key }[];
+    /** A mark on a square's corner (the class of the move shown in a review). */
+    badge?: { square: Key; glyph: string; kind: string; label: string };
     onmove: (orig: Key, dest: Key) => void;
   }
   let props: Props = $props();
@@ -236,12 +239,23 @@
       <polygon points={g.head} />
     {/each}
   </svg>
+  {#if props.badge}
+    {@const [cx, cy] = centre(props.badge.square)}
+    <span
+      class="badge note-{props.badge.kind}"
+      style="left:{((cx + 0.5) / 8) * 100}%;top:{((cy - 0.5) / 8) * 100}%"
+      role="img"
+      aria-label={props.badge.label}
+      title={props.badge.label}>{props.badge.glyph}</span
+    >
+  {/if}
 </div>
 
 <style>
   .board {
     /* The engine's suggestion in a review: green, apart from the player's own arrow colour. */
     --hl-best: var(--review-best);
+    container-type: inline-size;
     position: relative;
     width: 100%;
     aspect-ratio: 1;
@@ -326,6 +340,51 @@
   }
   .arrows polygon.hint {
     fill: var(--hl-best);
+  }
+  /* The class of the move shown, on the corner of its square, as on the big sites. */
+  .badge {
+    position: absolute;
+    z-index: 4;
+    width: 5.4%;
+    aspect-ratio: 1;
+    /* Inside the square's top-right corner, so edge squares never clip it. */
+    transform: translate(-104%, 4%);
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--badge, var(--panel-muted));
+    color: var(--panel);
+    box-shadow: 0 0 0 0.25cqw var(--panel), 0 0.3cqw 0.8cqw rgb(0 0 0 / 0.35);
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 2.4cqw;
+    line-height: 1;
+    letter-spacing: -0.06em;
+    pointer-events: none;
+  }
+  .badge.note-brilliant {
+    --badge: var(--review-brilliant);
+  }
+  .badge.note-excellent {
+    --badge: var(--review-excellent);
+  }
+  .badge.note-best {
+    --badge: var(--review-best);
+  }
+  .badge.note-good {
+    --badge: var(--review-good);
+  }
+  .badge.note-book {
+    --badge: var(--review-book);
+  }
+  .badge.note-inaccuracy {
+    --badge: var(--review-inaccuracy);
+  }
+  .badge.note-mistake {
+    --badge: var(--review-mistake);
+  }
+  .badge.note-blunder {
+    --badge: var(--review-blunder);
   }
   .cg :global(coords) {
     font-family: var(--font-ui);

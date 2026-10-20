@@ -85,7 +85,13 @@ export const MUSIC_TRACKS = [
 export type MusicTrack = (typeof MUSIC_TRACKS)[number]['id'];
 export const DEFAULT_TRACK: MusicTrack = MUSIC_TRACKS[0].id;
 
-const MUSIC_LEVEL = 0.22;
+/** Music volume 0..100 (Settings); the gain follows its square, so the slider feels even. */
+export const DEFAULT_MUSIC_VOLUME = 65;
+const MUSIC_MAX = 0.5;
+export function musicGain(volume: number): number {
+  const v = Math.max(0, Math.min(100, volume)) / 100;
+  return MUSIC_MAX * v * v;
+}
 const FADE_S = 2.5;
 /** Below this level a sample counts as silence (trimmed from the loop's ends). */
 const SILENCE = 0.002;
@@ -118,6 +124,7 @@ function loopSpan(b: AudioBuffer): [number, number] {
 class Music {
   private on = false;
   private track: MusicTrack = DEFAULT_TRACK;
+  private level = musicGain(DEFAULT_MUSIC_VOLUME);
   private bus: GainNode | null = null;
   private current: { src: AudioBufferSourceNode; gain: GainNode; track: MusicTrack } | null = null;
 
@@ -145,9 +152,19 @@ class Music {
       this.on = true;
       this.bus.gain.cancelScheduledValues(ac.currentTime);
       this.bus.gain.setValueAtTime(this.bus.gain.value, ac.currentTime);
-      this.bus.gain.linearRampToValueAtTime(MUSIC_LEVEL, ac.currentTime + FADE_S);
+      this.bus.gain.linearRampToValueAtTime(this.level, ac.currentTime + FADE_S);
     }
     if (this.current?.track !== this.track) void this.play();
+  }
+
+  /** Set the volume (0..100); a playing track follows within a fraction of a second. */
+  setVolume(volume: number): void {
+    this.level = musicGain(volume);
+    const ac = ctx;
+    if (!ac || !this.bus || !this.on) return;
+    this.bus.gain.cancelScheduledValues(ac.currentTime);
+    this.bus.gain.setValueAtTime(this.bus.gain.value, ac.currentTime);
+    this.bus.gain.linearRampToValueAtTime(this.level, ac.currentTime + 0.15);
   }
 
   stop(): void {

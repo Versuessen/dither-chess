@@ -129,6 +129,22 @@
       <div class="row">
         <Toggle legend="Music" value={musicChoice} options={musicOptions} onchange={setMusic} />
       </div>
+      <div class="row volume">
+        <label class="label" for="music-volume">Music volume</label>
+        <div class="slider">
+          <input
+            id="music-volume"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value={settings.value.musicVolume}
+            disabled={!settings.value.music}
+            oninput={(e) => set({ musicVolume: Number((e.currentTarget as HTMLInputElement).value) })}
+          />
+          <output for="music-volume">{settings.value.musicVolume}</output>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -199,6 +215,28 @@
     .rows.two {
       grid-template-columns: 1fr;
     }
+  }
+  .volume label {
+    display: block;
+    margin-bottom: 8px;
+  }
+  .slider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 320px;
+  }
+  .slider input {
+    flex: 1;
+    accent-color: var(--panel-ink);
+  }
+  .slider input:disabled {
+    opacity: 0.4;
+  }
+  .slider output {
+    min-width: 3ch;
+    text-align: right;
+    font-size: var(--ui-size-small);
   }
   .preview {
     position: relative;

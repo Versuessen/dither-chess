@@ -108,6 +108,12 @@
   });
   // The engine's move in the shown position, as an arrow.
   const hints = $derived(shown?.best ? [{ from: shown.best.slice(0, 2) as Key, to: shown.best.slice(2, 4) as Key }] : []);
+  // The shown move's class, on the corner of the square it went to.
+  const badge = $derived(
+    current
+      ? { square: current.uci.slice(2, 4) as Key, glyph: JUDGEMENT_GLYPH[current.judgement], kind: current.judgement, label: JUDGEMENT_LABEL[current.judgement] }
+      : undefined
+  );
   const whiteShare = $derived(shown ? winPercent(shown) : 50);
   const opening = $derived(openings && game ? nameOpening(openings, fens) : null);
 
@@ -242,7 +248,7 @@
               turnColor={fens[ply]?.split(' ')[1] === 'b' ? 'black' : 'white'}
               dests={new Map()}
               {lastMove}
-              check={false}
+              check={current && /[+#]/.test(current.san) ? (current.color === 'w' ? 'black' : 'white') : false}
               coordinates={settings.value.coordinates}
               showDests={false}
               palette={boardPalette(settings.value.colours)}
@@ -250,6 +256,7 @@
               animate={!ui.reducedMotion}
               viewOnly
               {hints}
+              {badge}
               label="Review board, move {ply} of {game.moves.length}"
               onmove={() => undefined}
             />

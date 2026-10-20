@@ -92,6 +92,13 @@ test('reviews a finished game with Stockfish and keeps the review', async ({ pag
   const h1 = await page.locator('.explain').evaluate((e) => e.getBoundingClientRect().height);
   await page.locator('ol.moves button', { hasText: 'Qxf7#' }).click();
   expect(await page.locator('.explain').evaluate((e) => e.getBoundingClientRect().height)).toBe(h1);
+  // The move's class sits on its square, and only the mated king is shown in check.
+  await expect(page.locator('.board .badge')).toHaveClass(/note-best/);
+  await expect(page.locator('.board .badge')).toHaveText('★');
+  await expect(page.locator('cg-board square.check')).toHaveCount(1);
+  await page.locator('ol.moves button', { hasText: 'Nf6' }).click();
+  await expect(page.locator('.board .badge')).toHaveText('??');
+  await expect(page.locator('cg-board square.check')).toHaveCount(0);
   // Book moves are marked; the timeline scrubs to a move.
   await expect(page.locator('ol.moves button', { hasText: /^e4/ }).first()).toHaveClass(/note-book/);
   const tl = page.getByRole('slider', { name: 'Timeline' });

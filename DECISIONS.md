@@ -266,3 +266,9 @@ See [CALIBRATION.md](CALIBRATION.md) for method, data and results; the decisions
 
 ### Music
 - **One track, looping**: the two CC0 tracks are 15 s and 24 s long, so playing them in turn with pauses meant a pause every 20 s or so. Now the chosen track (Settings → Sound) loops without a break; leading and trailing silence are trimmed from the loop, and a change of track cross-fades.
+
+## Patch round 3
+
+- **Move classes on the board**: in the review, the shown move's class sits as a round badge in the top-right corner of the square it went to (inside the square, so edge squares never clip it), in the class colour with its glyph (!!, !, ★, ✓, ≡, ·, ?!, ?, ??), as on chess.com. The checked king is highlighted in the review too.
+- **Check highlight**: the board was told only "in check", and chessground then marks the king of the side it believes is to move; while premoving that is set to the player, so the player's king lit up after giving check. The board now gets the colour actually in check.
+- **Music volume**: a 0–100 slider under Settings → Sound; the gain follows its square (0.5 at 100, the old level at the default 65).

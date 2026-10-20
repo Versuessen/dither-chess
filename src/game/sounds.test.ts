@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
-import { MUSIC_TRACKS, audibleSpan, soundForSan } from './sounds';
+import { MUSIC_TRACKS, audibleSpan, musicGain, soundForSan } from './sounds';
 import { DEFAULT_SETTINGS, sanitizeSettings } from '../app/settings.svelte';
 
 describe('sounds', () => {
@@ -37,6 +37,16 @@ describe('music', () => {
     expect(audibleSpan([left, right], rate)).toEqual([0.5, 2.701]);
     // Silence throughout: play the whole buffer.
     expect(audibleSpan([new Float32Array(2000)], rate)).toEqual([0, 2]);
+  });
+
+  it('maps the volume slider to a gain that rises evenly to the ear', () => {
+    expect(musicGain(0)).toBe(0);
+    expect(musicGain(100)).toBeCloseTo(0.5, 9);
+    expect(musicGain(50)).toBeCloseTo(0.125, 9);
+    expect(musicGain(150)).toBe(musicGain(100));
+    expect(sanitizeSettings({ musicVolume: 37.6 }).musicVolume).toBe(38);
+    expect(sanitizeSettings({ musicVolume: -5 }).musicVolume).toBe(0);
+    expect(sanitizeSettings({ musicVolume: Number.NaN }).musicVolume).toBe(DEFAULT_SETTINGS.musicVolume);
   });
 
   it('remembers the chosen track, and ignores unknown ones', () => {

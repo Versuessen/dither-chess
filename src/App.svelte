@@ -58,6 +58,9 @@
 
   // Optional background music; the audio context starts on the first gesture.
   $effect(() => {
+    music.setVolume(settings.value.musicVolume);
+  });
+  $effect(() => {
     if (settings.value.music) music.start(settings.value.musicTrack);
     else music.stop();
   });

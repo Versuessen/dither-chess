@@ -367,7 +367,7 @@
               movableColor={controller && live && !controller.outcome ? humanCg : undefined}
               {dests}
               lastMove={shownLastMove}
-              check={live && (controller?.check ?? false)}
+              check={live && controller?.check ? (controller.turn === 'b' ? 'black' : 'white') : false}
               coordinates={settings.value.coordinates}
               showDests={settings.value.showDests}
               {premoving}

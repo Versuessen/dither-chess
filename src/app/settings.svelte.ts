@@ -4,7 +4,7 @@
  */
 import { storage } from '../storage';
 import { DEFAULT_COLOURS, sanitizeColours, type ColourSettings } from './colours';
-import { DEFAULT_TRACK, MUSIC_TRACKS, type MusicTrack } from '../game/sounds';
+import { DEFAULT_MUSIC_VOLUME, DEFAULT_TRACK, MUSIC_TRACKS, type MusicTrack } from '../game/sounds';
 
 export type PieceSet = 'cburnett' | 'dither';
 
@@ -16,6 +16,8 @@ export interface AppSettings {
   /** Quiet music on the menus and in games: one track, looping. */
   music: boolean;
   musicTrack: MusicTrack;
+  /** 0..100. */
+  musicVolume: number;
   /** Bot moves as soon as inference finishes, with no human-like pause. */
   instantBot: boolean;
   premoves: boolean;
@@ -33,6 +35,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sounds: true,
   music: false,
   musicTrack: DEFAULT_TRACK,
+  musicVolume: DEFAULT_MUSIC_VOLUME,
   instantBot: false,
   premoves: true,
   showDests: true,
@@ -50,6 +53,7 @@ function sanitize(v: (Partial<AppSettings> & { boardColours?: unknown }) | undef
   // Settings saved before colours were customisable had only a board preset.
   if (!v.colours && v.boardColours === 'duotone') s.colours.board = 'duotone';
   if (v.pieceSet === 'cburnett' || v.pieceSet === 'dither') s.pieceSet = v.pieceSet;
+  if (typeof v.musicVolume === 'number' && Number.isFinite(v.musicVolume)) s.musicVolume = Math.round(Math.max(0, Math.min(100, v.musicVolume)));
   if (MUSIC_TRACKS.some((t) => t.id === v.musicTrack)) s.musicTrack = v.musicTrack!;
   for (const k of FLAGS) {
     if (typeof v[k] === 'boolean') s[k] = v[k];
