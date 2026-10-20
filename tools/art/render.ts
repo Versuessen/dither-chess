@@ -5,6 +5,8 @@
  *   node tools/art/render.ts hero mitre      only those scenes
  *   node tools/art/render.ts --scale 0.25 --preview <dir>
  *                                            quick low-resolution pass, plus composited previews
+ *   node tools/art/render.ts --scale 2 --out <dir>
+ *                                            larger renders somewhere else (print, wallpapers)
  *
  * Each output PNG is RGB: R = subject luminance, G = subject coverage, B = background luminance.
  */
@@ -18,7 +20,7 @@ import { renderScene, type Planes } from './raymarch.ts';
 import { MORPH_COLS, MORPH_FRAMES, MORPH_H, MORPH_W, SCENES, morphScene, type Scene } from './scenes.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const OUT = join(ROOT, 'public/art');
+let OUT = join(ROOT, 'public/art');
 
 interface Job {
   id: string;
@@ -72,6 +74,7 @@ if (!isMainThread) {
     const a = args[i]!;
     if (a === '--scale') scale = Number(args[++i]);
     else if (a === '--preview') preview = resolve(args[++i]!);
+    else if (a === '--out') OUT = resolve(args[++i]!);
     else ids.push(a);
   }
   const sceneIds = ids.length ? ids.filter((x) => x !== 'morph') : SCENES.map((s) => s.id);
