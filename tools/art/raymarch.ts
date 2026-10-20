@@ -107,15 +107,23 @@ export class Tracer {
   }
 
   softShadow(x: number, y: number, z: number, l: Vec3, k: number): number {
+    // Aaltonen's closest-approach estimate: no banded rings around the pieces.
     let res = 1;
-    let t = 0.03;
+    // A start jittered per point turns the remaining step bands into fine noise.
+    const j = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+    let t = 0.02 + 0.05 * (j - Math.floor(j));
+    let ph = 1e10;
     for (let i = 0; i < 64 && t < 12; i++) {
       const h = this.map(x + l[0] * t, y + l[1] * t, z + l[2] * t);
       if (h < 0.0005) return 0;
-      res = Math.min(res, (k * h) / t);
+      const yy = (h * h) / (2 * ph);
+      const d = Math.sqrt(Math.max(h * h - yy * yy, 0));
+      res = Math.min(res, (k * d) / Math.max(0.001, t - yy));
+      ph = h;
       t += clamp(h, 0.02, 0.4);
     }
-    return clamp(res, 0, 1);
+    res = clamp(res, 0, 1);
+    return res * res * (3 - 2 * res);
   }
 
   ao(x: number, y: number, z: number, n: Vec3): number {

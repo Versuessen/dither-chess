@@ -27,8 +27,8 @@ describe('router', () => {
 });
 
 describe('roster', () => {
-  it('has one persona per 100 points from 600 to 1900', () => {
-    expect(PERSONAS.map((p) => p.level)).toEqual(Array.from({ length: 14 }, (_, i) => 600 + 100 * i));
+  it('has one persona per 100 points from 600 to 1900, and one at the top (2050)', () => {
+    expect(PERSONAS.map((p) => p.level)).toEqual([...Array.from({ length: 14 }, (_, i) => 600 + 100 * i), 2050]);
   });
   it('gives every persona its own rendered image', () => {
     const subjects = PERSONAS.map((p) => p.subject);

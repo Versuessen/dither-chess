@@ -1,7 +1,7 @@
 /**
  * The dither layer: luminance -> a screen (rippled horizontal lines by default; ASCII glyphs, a
- * pixel mosaic or dotted lines for some opponents; behind the game, all of them morphing across
- * drifting Voronoi cells) -> duotone with an optional accent -> hash grain. One full-screen triangle, three textures (current subject, previous subject,
+ * pixel mosaic or dotted lines for some opponents; behind the game, all of them morphing into
+ * each other across slowly flowing blobs) -> duotone with an optional accent -> hash grain. One full-screen triangle, three textures (current subject, previous subject,
  * promotion atlas). All coordinates in device pixels unless noted.
  */
 
@@ -53,7 +53,7 @@ uniform float uCalm;          // 0..1 game-screen calm
 // Compiled per variant (fragmentSource): SCREEN_A / SCREEN_B are the screens of the incoming and
 // outgoing subjects (0 lines, 1 glyphs, 2 mosaic, 3 dotted lines); DISSOLVE and MORPH switch on
 // the code for a running dissolve and the promotion morph; MORPHSCREEN replaces the fixed screens
-// by the morphing Voronoi field. Constant screens let the compiler drop the unused patterns,
+// by the morphing blob field. Constant screens let the compiler drop the unused patterns,
 // which software renderers cannot do for uniforms.
 uniform vec3 uAccent;         // opponent's accent for the light ink
 uniform float uAccentAmt;     // 0..1
@@ -62,7 +62,7 @@ uniform sampler2D uGlyphs;    // glyph ramp, light to dark ink, in one row of sq
 uniform float uGlyphCount;
 uniform vec2 uScreenOffset;   // the screen pattern's own drift and parallax, device px
 uniform float uTime;          // seconds, for the morphing screen
-uniform float uCellSize;      // Voronoi cell size of the morphing screen, device px
+uniform float uCellSize;      // blob size of the morphing screen, device px
 
 out vec4 outColor;
 
@@ -185,37 +185,35 @@ float cover(float screen, int which, vec2 fc, float ripple, float g1, float grai
 }
 
 #if MORPHSCREEN
-vec2 hash2(vec2 p) {
-  return vec2(hash(p * 1.0 + 3.1), hash(p * 1.7 + 11.3));
+// Smooth value noise (quintic fade) and a few octaves of it.
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  float a = hash(i);
+  float b = hash(i + vec2(1.0, 0.0));
+  float c = hash(i + vec2(0.0, 1.0));
+  float d = hash(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
 
-// The morphing screen behind the game: drifting Voronoi cells, each showing one screen, which
-// it hands on to the next every few seconds through a pixel-by-pixel threshold dissolve.
-float morphScreen(vec2 fc) {
-  vec2 g = fc / uCellSize;
-  vec2 ip = floor(g);
-  float best = 1e9;
-  vec2 bestId = ip;
-  for (int y = -1; y <= 1; y++) {
-    for (int x = -1; x <= 1; x++) {
-      vec2 id = ip + vec2(float(x), float(y));
-      vec2 h = hash2(id);
-      vec2 seed = id + 0.5 + 0.38 * sin(uTime * vec2(0.09, 0.07) + 6.2831853 * h);
-      float d = length(g - seed);
-      if (d < best) {
-        best = d;
-        bestId = id;
-      }
-    }
-  }
-  float h = hash(bestId + 7.0);
-  float cyc = uTime / 11.0 + h * 4.0;
-  float k = floor(cyc);
-  float f = fract(cyc);
-  float s0 = mod(k + floor(h * 4.0), 4.0);
-  float s1 = mod(s0 + 1.0, 4.0);
-  float n = hash(floor(fc / (uPeriod * 2.0)) + bestId * 13.0);
-  return f > 0.8 && n < (f - 0.8) / 0.2 ? s1 : s0;
+float fbm(vec2 p) {
+  return 0.58 * vnoise(p) + 0.29 * vnoise(p * 2.03 + 17.1) + 0.13 * vnoise(p * 4.07 + 31.7);
+}
+
+// The morphing screen behind the game: soft blobs of a slowly flowing noise field. The field
+// value picks the screen (lines, glyphs, pixels, dots, in turn), and the whole ladder drifts
+// with time, so blobs grow, shrink and wander while each hands its screen on to the next.
+// Returns the screen below (x), the one above (y) and how far across the gradient band (z).
+vec3 morphScreen(vec2 fc) {
+  vec2 p = fc / uCellSize;
+  float t = uTime;
+  vec2 warp = vec2(vnoise(p * 0.7 + vec2(t * 0.021, 3.7)), vnoise(p * 0.7 + vec2(5.2, -t * 0.017))) - 0.5;
+  float f = fbm(p + warp * 1.4 + vec2(t * 0.013, -t * 0.009));
+  float s = f * 3.2 + t * 0.022;
+  float k = floor(s);
+  float w = smoothstep(0.45, 1.0, fract(s));
+  return vec3(mod(k, 4.0), mod(k + 1.0, 4.0), w);
 }
 #endif
 
@@ -238,15 +236,24 @@ void main() {
   float revealLine = clamp(uReveal * 1.6 - hash(vec2(line, 5.0)) * 0.6, 0.0, 1.0);
 
   // ---- coverage of both planes -----------------------------------------------------------
-#if MORPHSCREEN
-  float screenA = morphScreen(fc);
-  float screenB = screenA;
-#else
-  float screenA = float(SCREEN_A);
-  float screenB = float(SCREEN_B);
-#endif
   float tA, wA, dA, tB, wB, dB;
-  float covA = cover(screenA, 0, fc, ripple, g1, grainAmt, revealLine, tA, wA, dA);
+#if MORPHSCREEN
+  // Two neighbouring screens cross-fade over a wide band, so blobs meet in a gradient.
+  vec3 ms = morphScreen(fc);
+  float screenB = ms.x;
+  float covA = cover(ms.x, 0, fc, ripple, g1, grainAmt, revealLine, tA, wA, dA);
+  if (ms.z > 0.001) {
+    float t2, w2, d2;
+    float cov2 = cover(ms.y, 0, fc, ripple, g1, grainAmt, revealLine, t2, w2, d2);
+    covA = mix(covA, cov2, ms.z);
+    tA = mix(tA, t2, ms.z);
+    wA = mix(wA, w2, ms.z);
+    dA = mix(dA, d2, ms.z);
+  }
+#else
+  float screenB = float(SCREEN_B);
+  float covA = cover(float(SCREEN_A), 0, fc, ripple, g1, grainAmt, revealLine, tA, wA, dA);
+#endif
   float covB = covA;
   tB = tA; wB = wA; dB = dA;
 #if DISSOLVE
@@ -290,7 +297,7 @@ export interface FragmentVariant {
   /** null when no dissolve is running. */
   screenB: number | null;
   morph: boolean;
-  /** The morphing Voronoi screen (behind the game) instead of the fixed screens. */
+  /** The morphing blob screen (behind the game) instead of the fixed screens. */
   morphScreen: boolean;
 }
 

@@ -742,18 +742,23 @@ export class DitherRenderer {
     });
 
     const still = this.reducedMotion;
+    // A live scene moves in 3D (the camera circles it), so the picture itself never slides; a
+    // still image gets the flat parallax and drift instead.
+    const liveShown = this.sceneIds.some(Boolean) && !this.liveFailed;
+    const flat = !still && !liveShown;
     const driftScale = this.mode === 'calm' ? CALM_MOTION.drift : 1;
-    const [dx, dy] = still ? [0, 0] : (this.drift.at(t).map((v) => v * driftScale) as [number, number]);
+    const [dx, dy] = flat ? (this.drift.at(t).map((v) => v * driftScale) as [number, number]) : [0, 0];
     const px = still ? 0 : this.pointerSmooth[0];
     const py = still ? 0 : this.pointerSmooth[1];
-    const sy = still ? 0 : (this.scrollSmooth - 0.5) * 0.02;
-    // The screen pattern itself moves: with the pointer, and slowly on its own.
-    const screenOffset: [number, number] = still
-      ? [0, 0]
-      : [
-          (px * SCREEN_PARALLAX + Math.sin(t * 0.07) * SCREEN_DRIFT) * dpr * (this.mode === 'calm' ? 1 : 0.5),
-          (py * SCREEN_PARALLAX + Math.cos(t * 0.05) * SCREEN_DRIFT) * dpr * (this.mode === 'calm' ? 1 : 0.5)
-        ];
+    const ppx = flat ? px : 0;
+    const ppy = flat ? py : 0;
+    const sy = flat ? (this.scrollSmooth - 0.5) * 0.02 : 0;
+    // Behind the game the screen pattern itself moves: with the pointer, and slowly on its own.
+    // Elsewhere it holds still, so only the scene turns.
+    const screenOffset: [number, number] =
+      still || this.mode !== 'calm'
+        ? [0, 0]
+        : [(px * SCREEN_PARALLAX + Math.sin(t * 0.07) * SCREEN_DRIFT) * dpr, (py * SCREEN_PARALLAX + Math.cos(t * 0.05) * SCREEN_DRIFT) * dpr];
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, cur.tex);
@@ -778,13 +783,13 @@ export class DitherRenderer {
     gl.uniform1f(this.u('uDissolve'), dissolve);
     gl.uniform2f(
       this.u('uSubjOffset'),
-      -px * SUBJECT_PARALLAX + dx * DRIFT_STEP,
-      -py * SUBJECT_PARALLAX + dy * DRIFT_STEP + sy
+      -ppx * SUBJECT_PARALLAX + dx * DRIFT_STEP,
+      -ppy * SUBJECT_PARALLAX + dy * DRIFT_STEP + sy
     );
     gl.uniform2f(
       this.u('uBgOffset'),
-      -px * BG_PARALLAX + dx * DRIFT_STEP * 0.35,
-      -py * BG_PARALLAX + dy * DRIFT_STEP * 0.35 + sy * 0.3
+      -ppx * BG_PARALLAX + dx * DRIFT_STEP * 0.35,
+      -ppy * BG_PARALLAX + dy * DRIFT_STEP * 0.35 + sy * 0.3
     );
     gl.uniform2f(this.u('uGrainOffset'), px * GRAIN_PARALLAX * dpr, py * GRAIN_PARALLAX * dpr);
 

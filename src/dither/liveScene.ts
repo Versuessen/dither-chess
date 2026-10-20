@@ -230,17 +230,25 @@ vec3 normalAt(vec3 p) {
   return normalize(vec3(a - b - c + d, -a - b + c + d, -a + b - c + d));
 }
 
+// Soft shadow with Aaltonen's closest-approach estimate, which removes the banded rings the
+// plain k*h/t estimate leaves around pieces; twin of tools/art/raymarch.ts softShadow.
 float softShadow(vec3 p, vec3 l, float k) {
   float res = 1.0;
-  float t = 0.03;
-  for (int i = 0; i < 40; i++) {
+  // A start jittered per point turns the remaining step bands into fine noise, which the dither hides.
+  float t = 0.02 + 0.05 * fract(sin(dot(p.xz, vec2(12.9898, 78.233))) * 43758.5453);
+  float ph = 1e10;
+  for (int i = 0; i < 48; i++) {
     float h = map(p + l * t, true).x;
     if (h < 0.0008) return 0.0;
-    res = min(res, k * h / t);
-    t += clamp(h, 0.03, 0.45);
+    float y = h * h / (2.0 * ph);
+    float d = sqrt(max(h * h - y * y, 0.0));
+    res = min(res, k * d / max(0.001, t - y));
+    ph = h;
+    t += clamp(h, 0.02, 0.45);
     if (t > 12.0) break;
   }
-  return clamp(res, 0.0, 1.0);
+  res = clamp(res, 0.0, 1.0);
+  return res * res * (3.0 - 2.0 * res);
 }
 
 float ao(vec3 p, vec3 n) {
@@ -485,7 +493,10 @@ export class LiveScenes {
 
     // Camera: orbit the target a little with the pointer and a slow drift.
     const { pos, target, fov, roll = 0 } = spec.camera;
-    const yaw = motion.pointer[0] * 0.12 * motion.parallax + Math.sin(motion.time * 0.13) * 0.035 * motion.turn;
+    // Scenes on a board turn as one piece of furniture (the camera circles them); lone pieces
+    // also turn on their own axes below.
+    const onBoard = !!spec.board;
+    const yaw = motion.pointer[0] * 0.12 * motion.parallax + Math.sin(motion.time * 0.13) * (onBoard ? 0.07 : 0.035) * motion.turn;
     const pitch = motion.pointer[1] * 0.06 * motion.parallax;
     const rel: Vec3 = [pos[0] - target[0], pos[1] - target[1], pos[2] - target[2]];
     const cyw = Math.cos(yaw), syw = Math.sin(yaw);
@@ -516,12 +527,13 @@ export class LiveScenes {
     gl.uniform4f(this.u('uBoard'), b?.square ?? 1, b?.extent ?? 4, b?.light ?? 0, b?.dark ?? 0);
     gl.uniform3f(this.u('uBoardC'), b?.cx ?? 0, b?.cz ?? 0, b?.subject ? 1 : 0);
 
-    // Pieces: subjects turn slowly on their own axes, each at its own pace.
+    // Pieces: lone subjects turn slowly on their own axes, each at its own pace; on a board they
+    // stay put on their squares.
     const n = Math.min(MAX_OBJECTS, spec.pieces.length);
     gl.uniform1i(this.u('uObjCount'), n);
     for (let i = 0; i < n; i++) {
       const pc = spec.pieces[i]!;
-      const sway = pc.subject ? (Math.sin(motion.time * 0.29 + i * 1.7) * 0.26 + motion.pointer[0] * 0.18) * motion.turn : 0;
+      const sway = pc.subject && !onBoard ? (Math.sin(motion.time * 0.29 + i * 1.7) * 0.26 + motion.pointer[0] * 0.18) * motion.turn : 0;
       const R = rotation((pc.yaw ?? 0) + sway, pc.pitch ?? 0, pc.roll ?? 0);
       // Upload R^T (world -> local); GLSL mat3 is column-major, so R row-major is R^T column-major.
       gl.uniformMatrix3fv(this.u(`uObjRot[${i}]`), false, R);

@@ -127,9 +127,17 @@ export const PERSONAS: readonly Persona[] = [
     id: 'citadel',
     level: 1900,
     name: 'Citadel',
-    subject: 'citadel',
+    subject: 'fortress',
     bio: 'Patient and hard to break. Takes few risks and leaves it to you to find the plan.',
     look: { screen: 'dotted', accent: 6 }
+  },
+  {
+    id: 'zugzwang',
+    level: 2050,
+    name: 'Zugzwang',
+    subject: 'zugzwang',
+    bio: 'The strongest the model plays. Gives almost nothing away, keeps the pressure through quiet moves and wins the endgames others draw.',
+    look: { screen: 'lines', accent: 7 }
   }
 ];
 

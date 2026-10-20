@@ -85,6 +85,11 @@ export const board = (over: Partial<BoardSpec> = {}): BoardSpec => ({
 });
 
 const sq = 1.15;
+/**
+ * The centre of a square on a board of square size `size` centred at the origin: file 0..7
+ * (a..h), rank 1..8, White's side towards +z. Pieces sit on square centres.
+ */
+const on = (size: number, file: number, rank: number) => ({ x: (file - 3.5) * size, z: (4.5 - rank) * size });
 const ivory = (piece: PieceName, at: Omit<ScenePiece, 'piece' | 'albedo' | 'subject'> = {}): ScenePiece => ({ piece, ...at, albedo: IVORY, subject: true });
 
 export const SCENE_SPECS: SceneSpec[] = [
@@ -96,7 +101,7 @@ export const SCENE_SPECS: SceneSpec[] = [
     focal: [0.48, 0.45]
   }),
   base('pawn-crown', {
-    camera: { pos: [1.05, 3.05, 1.45], target: [0.05, 2.0, 0], fov: 40 },
+    camera: { pos: [2.55, 3.35, 3.75], target: [0.05, 1.3, 0], fov: 40 },
     pieces: [ivory('pawn')],
     focal: [0.5, 0.42]
   }),
@@ -120,7 +125,7 @@ export const SCENE_SPECS: SceneSpec[] = [
     focal: [0.5, 0.35]
   }),
   base('mitre', {
-    camera: { pos: [0.55, 3.0, 2.15], target: [0, 2.72, 0], fov: 38 },
+    camera: { pos: [1.45, 3.15, 4.9], target: [0, 2.0, 0], fov: 38 },
     key: { dir: norm([-0.7, 0.7, 0.6]), intensity: 1.2, softness: 10 },
     pieces: [ivory('bishop')],
     focal: [0.5, 0.45]
@@ -128,7 +133,7 @@ export const SCENE_SPECS: SceneSpec[] = [
   base('board-rake', {
     camera: { pos: [0.35, 0.95, 4.7], target: [-0.1, -0.2, -4], fov: 60 },
     key: { dir: norm([-0.8, 0.5, -0.4]), intensity: 1.3, softness: 14 },
-    pieces: [{ piece: 'pawn', x: 0.95 * 0.5, z: 0.95 * 2.5, scale: 0.5, albedo: EBONY + 0.1, subject: true }],
+    pieces: [{ piece: 'pawn', ...on(0.95, 4, 2), scale: 0.4, albedo: EBONY + 0.1, subject: true }],
     board: board({ subject: true, square: 0.95 }),
     fog: 0.035,
     void: { top: 0.06, bottom: 0.02, glow: 0.35, glowAt: [0.5, 0.18] },
@@ -143,22 +148,22 @@ export const SCENE_SPECS: SceneSpec[] = [
     focal: [0.5, 0.45]
   }),
   base('pawn-chain', {
-    camera: { pos: [3.6, 2.2, 4.6], target: [-0.4, 1.0, -0.6], fov: 44 },
+    camera: { pos: [4.18, 2.2, 4.03], target: [0.18, 1.0, -1.18], fov: 44 },
     key: { dir: norm([-0.9, 0.7, 0.4]), intensity: 1.2, softness: 9 },
-    pieces: [0, 1, 2, 3, 4].map((i) => ivory('pawn', { x: (i - 1.5) * sq - sq / 2, z: (1.5 - i) * sq + sq / 2, scale: 0.5 })),
+    pieces: [0, 1, 2, 3, 4].map((i) => ivory('pawn', { ...on(sq, 2 + i, 3 + i), scale: 0.45 })),
     board: board({ square: sq }),
     fog: 0.02,
     focal: [0.45, 0.5]
   }),
   base('outpost', {
-    camera: { pos: [0, 1.55, 5.4], target: [0, 1.35, 0], fov: 40 },
+    camera: { pos: [0, 1.55, 6.6], target: [0, 1.35, 1.2], fov: 40 },
     key: { dir: norm([0, 0.9, 0.5]), intensity: 1.2, softness: 8 },
     rim: { dir: norm([0, 0.4, -1]), intensity: 0.9 },
     pieces: [
-      ivory('knight', { x: -1.15, yaw: Math.PI / 2, scale: 0.85 }),
-      { piece: 'knight', x: 1.15, yaw: -Math.PI / 2, scale: 0.85, albedo: EBONY + 0.25, subject: true }
+      ivory('knight', { ...on(2.4, 3, 4), yaw: Math.PI / 2, scale: 0.85 }),
+      { piece: 'knight', ...on(2.4, 4, 4), yaw: -Math.PI / 2, scale: 0.85, albedo: EBONY + 0.25, subject: true }
     ],
-    board: board({ square: sq }),
+    board: board({ square: 2.4 }),
     fog: 0.03,
     focal: [0.5, 0.5]
   }),
@@ -186,24 +191,45 @@ export const SCENE_SPECS: SceneSpec[] = [
     void: { top: 0.12, bottom: 0.02, glow: 0.6, glowAt: [0.5, 0.42] },
     focal: [0.5, 0.45]
   }),
-  base('citadel', {
-    camera: { pos: [0.3, 0.25, 4.1], target: [0, 1.75, 0], fov: 46 },
-    key: { dir: norm([-0.6, 0.7, 0.5]), intensity: 1.2, softness: 9 },
-    rim: { dir: norm([0.9, 0.4, -0.5]), intensity: 0.8 },
-    pieces: [ivory('rook')],
-    board: board({ square: sq }),
+  base('fortress', {
+    camera: { pos: [1.4, 1.75, -0.6], target: [4.3, 0.85, 4.6], fov: 42 },
+    key: { dir: norm([-0.6, 0.8, -0.6]), intensity: 1.2, softness: 10 },
+    rim: { dir: norm([0.5, 0.35, 0.9]), intensity: 1.0 },
+    pieces: [
+      ivory('king', { ...on(1.6, 6, 1), scale: 0.55 }),
+      ivory('rook', { ...on(1.6, 5, 1), scale: 0.55 }),
+      ivory('pawn', { ...on(1.6, 5, 2), scale: 0.55 }),
+      ivory('pawn', { ...on(1.6, 6, 2), scale: 0.55 }),
+      ivory('pawn', { ...on(1.6, 7, 2), scale: 0.55 })
+    ],
+    board: board({ square: 1.6 }),
+    fog: 0.025,
+    focal: [0.55, 0.5]
+  }),
+  base('zugzwang', {
+    camera: { pos: [9.6, 1.7, -3.2], target: [0.8, 1.1, -4.0], fov: 27 },
+    key: { dir: norm([0.3, 0.6, 1]), intensity: 0.75, softness: 7 },
+    rim: { dir: norm([-0.4, 0.3, -1]), intensity: 1.4 },
+    ambient: 0.09,
+    pieces: [
+      ivory('king', { ...on(1.6, 4, 6), scale: 0.6 }),
+      ivory('pawn', { ...on(1.6, 4, 7), scale: 0.6 }),
+      { piece: 'king', ...on(1.6, 4, 8), scale: 0.6, albedo: EBONY + 0.15, subject: true }
+    ],
+    board: board({ square: 1.6 }),
     fog: 0.03,
-    focal: [0.5, 0.4]
+    void: { top: 0.1, bottom: 0.02, glow: 0.5, glowAt: [0.42, 0.38] },
+    focal: [0.5, 0.5]
   }),
   base('fork', {
-    camera: { pos: [2.6, 3.4, 4.2], target: [0, 0.9, 0], fov: 44 },
+    camera: { pos: [4.6, 4.6, 5.4], target: [0.9, 0.9, -0.9], fov: 44 },
     key: { dir: norm([-0.5, 0.9, 0.3]), intensity: 1.2, softness: 9 },
     pieces: [
-      ivory('knight', { scale: 0.6 }),
-      { piece: 'king', x: -sq * 1, z: -sq * 2, scale: 0.6, albedo: EBONY + 0.2, subject: true },
-      { piece: 'rook', x: sq * 1, z: -sq * 2, scale: 0.6, albedo: EBONY + 0.2, subject: true }
+      ivory('knight', { ...on(1.8, 4, 4), scale: 0.6 }),
+      { piece: 'king', ...on(1.8, 3, 6), scale: 0.6, albedo: EBONY + 0.2, subject: true },
+      { piece: 'rook', ...on(1.8, 5, 6), scale: 0.6, albedo: EBONY + 0.2, subject: true }
     ],
-    board: board({ square: sq, cx: sq / 2, cz: sq / 2 }),
+    board: board({ square: 1.8 }),
     fog: 0.02,
     focal: [0.5, 0.5]
   })
